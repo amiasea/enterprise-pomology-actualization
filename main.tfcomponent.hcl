@@ -22,7 +22,7 @@ component "espalier" {
     pomology = each.value
     repo_name_prefix = each.key
 
-    github_organization = var.github_organization_name
+    github_organization_name = var.github_organization_name
     github_app_id = var.gha_id
   }
 
