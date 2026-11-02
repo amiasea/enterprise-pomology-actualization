@@ -13,6 +13,8 @@ variable "gha_installation_id" {
 
 variable "gha_pem_file" {
   type = string
+  sensitive = true
+  ephemeral = true
 }
 
 ///// artifact_access /////
