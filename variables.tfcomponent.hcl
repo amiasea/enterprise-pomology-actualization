@@ -1,5 +1,5 @@
 variable "github_organization_name" {
-  type = string
+  type    = string
   default = "amiasea"
 }
 
@@ -12,12 +12,18 @@ variable "gha_installation_id" {
 }
 
 variable "gha_pem_file" {
-  type = string
+  type      = string
   sensitive = true
   ephemeral = true
 }
 
 ///// artifact_access /////
+
+variable "aws_identity_token" {
+  description = "JWT identity token from the GitHub Actions workflow that will be used to assume the AWS role."
+  type        = string
+  ephemeral   = true
+}
 
 variable "codeartifact_domain" {
   description = "Name of the shared CodeArtifact domain."
@@ -34,6 +40,11 @@ variable "codeartifact_domain_owner" {
   type        = string
 }
 
+variable "solution_actualization_role_arn" {
+  description = "ARN of the AWS role that will be assumed by the GitHub Actions workflow to perform solution actualization."
+  type        = string
+}
+
 variable "github_oidc_provider_arn" {
   description = "ARN of the GitHub Actions OIDC provider created by artifact-foundation."
   type        = string
@@ -43,5 +54,5 @@ variable "github_oidc_provider_arn" {
 
 variable "solution_definitions_release_tag" {
   description = "Solution definitions release tag"
-  type = string
+  type        = string
 }
