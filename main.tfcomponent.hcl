@@ -76,7 +76,7 @@ locals {
   }
 }
 
-component "solution_aspect_option_aws_artifacts" {
+component "solution_aspect_options_aws_artifacts" {
   source   = "./modules/solution_aspect_options_aws_artifacts"
   for_each = component.solution_definitions.pomologies
 
