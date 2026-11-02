@@ -3,10 +3,6 @@ variable "github_organization_name" {
   default = "amiasea"
 }
 
-variable "github_organization_id" {
-  type = string
-}
-
 variable "gha_id" {
   type = string
 }
