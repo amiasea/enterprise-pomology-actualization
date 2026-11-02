@@ -25,6 +25,10 @@ component "espalier" {
     github_organization = var.github_organization_name
     github_app_id = var.gha_id
   }
+
+  providers = {
+    github = provider.github.this
+  }
 }
 
 locals {
@@ -83,6 +87,10 @@ component "solution_aspect_option_aws_artifacts" {
 
     codeartifact_domain = var.codeartifact_domain
   }
+
+  providers = {
+    aws = provider.aws.this
+  }
 }
 
 component "aws_artifact_publish_access" {
@@ -104,6 +112,10 @@ component "aws_artifact_publish_access" {
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
   }
+
+  providers = {
+    aws = provider.aws.this
+  }
 }
 
 component "aws_artifact_restore_access" {
@@ -124,5 +136,9 @@ component "aws_artifact_restore_access" {
     codeartifact_package_arns = values(each.value.codeartifact_package_arns)
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
+  }
+
+  providers = {
+    aws = provider.aws.this
   }
 }
