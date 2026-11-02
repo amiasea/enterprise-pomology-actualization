@@ -15,7 +15,6 @@ deployment "solutions" {
     gha_installation_id = store.varset.this.stable.gha_installation_id
     gha_pem_file        = store.varset.this.gha_pem_file
 
-    aws_role_arn       = "arn:aws:iam::<account-id>:role/amiasea-solution-actualization"
     aws_identity_token = identity_token.aws.jwt
 
     codeartifact_domain             = store.varset.this.stable.codeartifact_domain
