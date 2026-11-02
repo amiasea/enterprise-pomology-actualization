@@ -45,6 +45,11 @@ variable "solution_actualization_role_arn" {
   type        = string
 }
 
+variable "solution_artifact_role_boundary_arn" {
+  description = "ARN of the AWS role boundary that will be applied to the solution artifact roles."
+  type        = string
+}
+
 variable "github_oidc_provider_arn" {
   description = "ARN of the GitHub Actions OIDC provider created by artifact-foundation."
   type        = string

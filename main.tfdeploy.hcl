@@ -17,10 +17,11 @@ deployment "solutions" {
 
     aws_identity_token = identity_token.aws.jwt
 
-    codeartifact_domain             = store.varset.this.stable.codeartifact_domain
-    codeartifact_domain_arn         = store.varset.this.stable.codeartifact_domain_arn
-    codeartifact_domain_owner       = store.varset.this.stable.codeartifact_domain_owner
-    solution_actualization_role_arn = store.varset.this.stable.solution_actualization_role_arn
+    codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
+    codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
+    codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
+    solution_actualization_role_arn     = store.varset.this.stable.solution_actualization_role_arn
+    solution_artifact_role_boundary_arn = store.varset.this.stable.solution_artifact_role_boundary_arn
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 

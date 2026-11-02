@@ -111,6 +111,8 @@ component "aws_artifact_publish_access" {
     codeartifact_package_arns = values(each.value.codeartifact_package_arns)
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
+
+    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
 
   providers = {
@@ -136,6 +138,8 @@ component "aws_artifact_restore_access" {
     codeartifact_package_arns = values(each.value.codeartifact_package_arns)
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
+
+    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
 
   providers = {

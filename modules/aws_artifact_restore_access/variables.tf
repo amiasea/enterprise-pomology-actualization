@@ -53,3 +53,8 @@ variable "ecr_repository_arns" {
     error_message = "At least one ECR repository ARN must be supplied."
   }
 }
+
+variable "solution_artifact_role_boundary_arn" {
+  description = "ARN of the AWS role boundary that will be applied to the solution artifact roles."
+  type        = string
+}
