@@ -1,5 +1,5 @@
 store "varset" "this" {
-  name = "solution-actualization"
+  name = "enterprise-solution-actualization"
   category = "terraform"
 }
 

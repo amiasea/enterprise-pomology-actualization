@@ -19,11 +19,11 @@ component "espalier" {
   for_each = component.solution_definitions.pomologies
 
   inputs = {
-    pomology = each.value
+    pomology         = each.value
     repo_name_prefix = each.key
 
     github_organization_name = var.github_organization_name
-    github_app_id = var.gha_id
+    github_app_id            = var.gha_id
   }
 
   providers = {
