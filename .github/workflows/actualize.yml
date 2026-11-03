@@ -1,0 +1,209 @@
+
+name: Actualize enterprise solutions
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  id-token: write
+
+# Avoid overlapping actualization workflows.
+concurrency:
+  group: enterprise-solution-actualization
+  cancel-in-progress: false
+
+jobs:
+  actualize:
+    name: Actualize and retrieve topology
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    # Provides a stable OIDC subject for the Azure federated credential.
+    # environment: institutive
+
+    env:
+      HCP_STACK_ID: ${{ vars.SOLUTION_ACTUALIZATION_STACK_ID }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_INSTITUTIVE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_INSTITUTIVE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_INSTITUTIVE_SUBSCRIPTION_ID }}
+      KEY_VAULT_NAME: ${{ vars.INSTITUTIVE_KEY_VAULT_NAME }}
+      HCP_TOKEN_SECRET_ID: ${{ vars.AMIASEA_TFE_TOKEN_VERSIONLESS_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Authenticate to Azure using OIDC
+        uses: azure/login@v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_INSTITUTIVE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_INSTITUTIVE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_INSTITUTIVE_SUBSCRIPTION_ID }}
+
+      - name: Retrieve HCP Terraform token from Key Vault
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if (-not $env:HCP_TOKEN_SECRET_ID) {
+            throw "AMIASEA_TFE_TOKEN_VERSIONLESS_ID is not configured."
+          }
+
+          $token = az keyvault secret show `
+            --id $env:HCP_TOKEN_SECRET_ID `
+            --query value `
+            --output tsv
+
+          if ($LASTEXITCODE -ne 0 -or -not $token) {
+            throw "Failed to retrieve the HCP Terraform token from Key Vault."
+          }
+
+          Write-Output "::add-mask::$token"
+
+          "HCP_TOKEN=$token" >> $env:GITHUB_ENV
+
+      - name: Wait for Stack deployment and retrieve outputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if (-not $env:HCP_STACK_ID) {
+            throw "SOLUTION_ACTUALIZATION_STACK_ID is not configured."
+          }
+
+          if (-not $env:HCP_TOKEN) {
+            throw "Failed to retrieve the HCP Terraform token."
+          }
+
+          $api = "https://app.terraform.io/api/v2"
+          $tag = $env:GITHUB_REF_NAME
+          $commit = $env:GITHUB_SHA
+          $deadline = (Get-Date).ToUniversalTime().AddMinutes(50)
+
+          $headers = @{
+            Authorization = "Bearer $env:HCP_TOKEN"
+            Accept        = "application/vnd.api+json"
+          }
+
+          function Get-HcpResource {
+            param([string]$Path)
+
+            Invoke-RestMethod `
+              -Method Get `
+              -Uri "$api$Path" `
+              -Headers $headers
+          }
+
+          Write-Host "Waiting for Stack configuration."
+          Write-Host "Tag: $tag"
+          Write-Host "Commit: $commit"
+
+          # Find the configuration created from this exact VCS tag.
+          $configuration = $null
+
+          while (-not $configuration) {
+            if ((Get-Date).ToUniversalTime() -gt $deadline) {
+              throw "Timed out waiting for the Stack configuration."
+            }
+
+            $response = Get-HcpResource `
+              "/stacks/$env:HCP_STACK_ID/stack-configurations?include=ingress_attributes&page%5Bsize%5D=100"
+
+            foreach ($candidate in $response.data) {
+              $ingressId = $candidate.relationships.'ingress-attributes'.data.id
+
+              if (-not $ingressId) {
+                continue
+              }
+
+              $ingress = $response.included |
+                Where-Object { $_.id -eq $ingressId } |
+                Select-Object -First 1
+
+              if (
+                $ingress.attributes.tag -eq $tag -and
+                $ingress.attributes.'commit-sha' -eq $commit
+              ) {
+                $configuration = $candidate
+                break
+              }
+            }
+
+            if (-not $configuration) {
+              Start-Sleep -Seconds 10
+            }
+          }
+
+          Write-Host "Found Stack configuration: $($configuration.id)"
+
+          if ($configuration.attributes.status -eq "errored") {
+            throw "Stack configuration preparation failed: $($configuration.id)"
+          }
+
+          # Wait for the solutions deployment run belonging to that configuration.
+          $deploymentRun = $null
+
+          while (
+            -not $deploymentRun -or
+            $deploymentRun.attributes.status -notin @("succeeded", "failed", "abandoned")
+          ) {
+            if ((Get-Date).ToUniversalTime() -gt $deadline) {
+              throw "Timed out waiting for the solutions deployment."
+            }
+
+            $runs = Get-HcpResource `
+              "/stack-configurations/$($configuration.id)/stack-deployment-runs?page%5Bsize%5D=100"
+
+            $deploymentRun = $runs.data |
+              Where-Object { $_.attributes.deployment -eq "solutions" } |
+              Select-Object -First 1
+
+            if (-not $deploymentRun) {
+              Start-Sleep -Seconds 10
+              continue
+            }
+
+            $status = $deploymentRun.attributes.status
+
+            Write-Host "Deployment run: $($deploymentRun.id)"
+            Write-Host "Status: $status"
+
+            if ($status -in @("failed", "abandoned")) {
+              throw "Stack deployment ended with status: $status"
+            }
+
+            if ($status -ne "succeeded") {
+              Start-Sleep -Seconds 15
+            }
+          }
+
+          Write-Host "Stack deployment succeeded."
+
+          # Retrieve the Stack's latest aggregated output summary.
+          $outputPath = Join-Path $env:GITHUB_WORKSPACE "solution-variety-topologies.json"
+
+          Invoke-WebRequest `
+            -Uri "$api/stacks/$env:HCP_STACK_ID/latest-output-summary" `
+            -Headers $headers `
+            -OutFile $outputPath
+
+          # Verify that the response is JSON and display it for inspection.
+          $outputs = Get-Content $outputPath -Raw | ConvertFrom-Json
+
+          Write-Host "Retrieved Stack output summary:"
+          $outputs | ConvertTo-Json -Depth 100 | Write-Host
+
+          "stack_tag=$tag" >> $env:GITHUB_OUTPUT
+          "configuration_id=$($configuration.id)" >> $env:GITHUB_OUTPUT
+          "deployment_run_id=$($deploymentRun.id)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload Stack output summary
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: solution-variety-topologies
+          path: solution-variety-topologies.json
+          if-no-files-found: error
+          retention-days: 7
