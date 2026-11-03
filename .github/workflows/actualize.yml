@@ -1,4 +1,3 @@
-
 name: Actualize enterprise solutions
 
 on:
@@ -19,23 +18,16 @@ jobs:
   actualize:
     name: Actualize and retrieve topology
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
 
     # Provides a stable OIDC subject for the Azure federated credential.
     # environment: institutive
 
     env:
       HCP_STACK_ID: ${{ vars.SOLUTION_ACTUALIZATION_STACK_ID }}
-      AZURE_CLIENT_ID: ${{ vars.AZURE_INSTITUTIVE_CLIENT_ID }}
-      AZURE_TENANT_ID: ${{ vars.AZURE_INSTITUTIVE_TENANT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_INSTITUTIVE_SUBSCRIPTION_ID }}
-      KEY_VAULT_NAME: ${{ vars.INSTITUTIVE_KEY_VAULT_NAME }}
       HCP_TOKEN_SECRET_ID: ${{ vars.AMIASEA_TFE_TOKEN_VERSIONLESS_ID }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
       - name: Authenticate to Azure using OIDC
         uses: azure/login@v3.1.0
         with:
@@ -80,8 +72,7 @@ jobs:
 
           $api = "https://app.terraform.io/api/v2"
           $tag = $env:GITHUB_REF_NAME
-          $commit = $env:GITHUB_SHA
-          $deadline = (Get-Date).ToUniversalTime().AddMinutes(50)
+          $commit = $env.GITHUB_SHA
 
           $headers = @{
             Authorization = "Bearer $env:HCP_TOKEN"
@@ -97,44 +88,40 @@ jobs:
               -Headers $headers
           }
 
-          Write-Host "Waiting for Stack configuration."
           Write-Host "Tag: $tag"
           Write-Host "Commit: $commit"
 
-          # Find the configuration created from this exact VCS tag.
+          # Allow HCP Terraform time to register the VCS tag event.
+          Start-Sleep -Seconds 10
+
+          # Find the Stack configuration created from this exact tag and commit.
+          $response = Get-HcpResource `
+            "/stacks/$env:HCP_STACK_ID/stack-configurations?include=ingress_attributes&page%5Bsize%5D=100"
+
           $configuration = $null
 
-          while (-not $configuration) {
-            if ((Get-Date).ToUniversalTime() -gt $deadline) {
-              throw "Timed out waiting for the Stack configuration."
+          foreach ($candidate in $response.data) {
+            $ingressId = $candidate.relationships.'ingress-attributes'.data.id
+
+            if (-not $ingressId) {
+              continue
             }
 
-            $response = Get-HcpResource `
-              "/stacks/$env:HCP_STACK_ID/stack-configurations?include=ingress_attributes&page%5Bsize%5D=100"
+            $ingress = $response.included |
+              Where-Object { $_.id -eq $ingressId } |
+              Select-Object -First 1
 
-            foreach ($candidate in $response.data) {
-              $ingressId = $candidate.relationships.'ingress-attributes'.data.id
-
-              if (-not $ingressId) {
-                continue
-              }
-
-              $ingress = $response.included |
-                Where-Object { $_.id -eq $ingressId } |
-                Select-Object -First 1
-
-              if (
-                $ingress.attributes.tag -eq $tag -and
-                $ingress.attributes.'commit-sha' -eq $commit
-              ) {
-                $configuration = $candidate
-                break
-              }
+            if (
+              $ingress.attributes.tag -eq $tag -and
+              $ingress.attributes.'commit-sha' -eq $commit
+            ) {
+              $configuration = $candidate
+              break
             }
+          }
 
-            if (-not $configuration) {
-              Start-Sleep -Seconds 10
-            }
+          if (-not $configuration) {
+            throw "No Stack configuration exists for tag '$tag' and commit '$commit'."
           }
 
           Write-Host "Found Stack configuration: $($configuration.id)"
@@ -143,41 +130,53 @@ jobs:
             throw "Stack configuration preparation failed: $($configuration.id)"
           }
 
-          # Wait for the solutions deployment run belonging to that configuration.
-          $deploymentRun = $null
+          # Find the latest solutions deployment run already associated with this configuration.
+          $runs = Get-HcpResource `
+            "/stack-configurations/$($configuration.id)/stack-deployment-runs?page%5Bsize%5D=100"
 
-          while (
-            -not $deploymentRun -or
-            $deploymentRun.attributes.status -notin @("succeeded", "failed", "abandoned")
-          ) {
-            if ((Get-Date).ToUniversalTime() -gt $deadline) {
-              throw "Timed out waiting for the solutions deployment."
+          $deploymentRun = $runs.data |
+            Where-Object { $_.attributes.deployment -eq "solutions" } |
+            Select-Object -First 1
+
+          if (-not $deploymentRun) {
+            throw "No existing solutions deployment run was found for configuration '$($configuration.id)'."
+          }
+
+          $deploymentRunId = $deploymentRun.id
+
+          Write-Host "Found solutions deployment run: $deploymentRunId"
+
+          # Wait up to 10 minutes for this run to reach a terminal state.
+          $deadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
+
+          $failureStatuses = @(
+            "failed",
+            "errored",
+            "abandoned",
+            "canceled",
+            "cancelled"
+          )
+
+          while ($true) {
+            if ([DateTimeOffset]::UtcNow -ge $deadline) {
+              throw "Timed out after 10 minutes waiting for deployment run '$deploymentRunId'."
             }
 
-            $runs = Get-HcpResource `
-              "/stack-configurations/$($configuration.id)/stack-deployment-runs?page%5Bsize%5D=100"
+            $runResponse = Get-HcpResource "/stack-deployment-runs/$deploymentRunId"
+            $status = $runResponse.data.attributes.status
 
-            $deploymentRun = $runs.data |
-              Where-Object { $_.attributes.deployment -eq "solutions" } |
-              Select-Object -First 1
-
-            if (-not $deploymentRun) {
-              Start-Sleep -Seconds 10
-              continue
-            }
-
-            $status = $deploymentRun.attributes.status
-
-            Write-Host "Deployment run: $($deploymentRun.id)"
+            Write-Host "Deployment run: $deploymentRunId"
             Write-Host "Status: $status"
 
-            if ($status -in @("failed", "abandoned")) {
+            if ($status -eq "succeeded") {
+              break
+            }
+
+            if ($status -in $failureStatuses) {
               throw "Stack deployment ended with status: $status"
             }
 
-            if ($status -ne "succeeded") {
-              Start-Sleep -Seconds 15
-            }
+            Start-Sleep -Seconds 15
           }
 
           Write-Host "Stack deployment succeeded."
@@ -190,6 +189,10 @@ jobs:
             -Headers $headers `
             -OutFile $outputPath
 
+          if (-not (Test-Path $outputPath) -or (Get-Item $outputPath).Length -eq 0) {
+            throw "The Stack output summary was empty or was not created."
+          }
+
           # Verify that the response is JSON and display it for inspection.
           $outputs = Get-Content $outputPath -Raw | ConvertFrom-Json
 
@@ -197,8 +200,9 @@ jobs:
           $outputs | ConvertTo-Json -Depth 100 | Write-Host
 
           "stack_tag=$tag" >> $env:GITHUB_OUTPUT
+          "commit_sha=$commit" >> $env:GITHUB_OUTPUT
           "configuration_id=$($configuration.id)" >> $env:GITHUB_OUTPUT
-          "deployment_run_id=$($deploymentRun.id)" >> $env:GITHUB_OUTPUT
+          "deployment_run_id=$deploymentRunId" >> $env:GITHUB_OUTPUT
 
       - name: Upload Stack output summary
         uses: actions/upload-artifact@v7.0.2
