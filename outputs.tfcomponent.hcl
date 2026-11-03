@@ -8,14 +8,14 @@ output "solution_variety_topologies" {
       cordons = map(object({
         repository = object({
           name    = string
-          id      = number
+          id      = string
           node_id = string
         })
 
         leaves = map(object({
           repository = object({
             name    = string
-            id      = number
+            id      = string
             node_id = string
           })
 
