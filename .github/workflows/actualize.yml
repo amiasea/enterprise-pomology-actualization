@@ -124,82 +124,118 @@ jobs:
             throw "GitHub SHA '$commit' does not match event.after '$eventAfter'."
           }
 
-          # List every configuration associated with this Stack.
-          $configurationList = Invoke-TerraformJson @(
-            "configuration",
-            "list",
-            "-stack-id",
-            $env:HCP_STACK_ID,
-            "-json"
-          )
+                    # Discover the Stack configuration for this exact GitHub commit.
+          # HCP may take time to register and prepare a new configuration.
 
-          $configurations = @($configurationList.configurations)
+          $configurationDeadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
+          $configuration = $null
 
-          if ($configurations.Count -eq 0) {
-            throw "No configurations exist for Stack '$env:HCP_STACK_ID'."
-          }
-
-          Write-Host ""
-          Write-Host "Inspecting $($configurations.Count) Stack configurations:"
-
-          $matchingConfigurations = @()
-
-          foreach ($item in $configurations) {
-            $detail = Invoke-TerraformJson @(
+          while ([DateTimeOffset]::UtcNow -lt $configurationDeadline) {
+            $configurationList = Invoke-TerraformJson @(
               "configuration",
-              "show",
-              "-configuration-id",
-              $item.id,
+              "list",
+              "-stack-id",
+              $env:HCP_STACK_ID,
               "-json"
             )
 
-            $ingress = $detail.ingress_attributes
+            $configurations = @($configurationList.configurations)
 
             Write-Host ""
-            Write-Host "Configuration: $($item.id)"
-            Write-Host "  Sequence:       $($detail.configuration.sequence_number)"
-            Write-Host "  Status:         $($detail.configuration.status)"
-            Write-Host "  Commit SHA:     $($ingress.commit_sha)"
-            Write-Host "  Commit message: $($ingress.commit_message)"
-            Write-Host "  Branch:         '$($ingress.branch)'"
-            Write-Host "  Default branch: $($ingress.on_default_branch)"
-            Write-Host "  Pull request:   $($ingress.is_pull_request)"
+            Write-Host "Inspecting $($configurations.Count) Stack configurations."
 
-            if ($ingress.commit_sha -eq $commit) {
-              $matchingConfigurations += $detail
+            $matchingConfigurations = @()
+
+            foreach ($item in $configurations) {
+              $detail = Invoke-TerraformJson @(
+                "configuration",
+                "show",
+                "-configuration-id",
+                $item.id,
+                "-json"
+              )
+
+              $ingress = $detail.ingress_attributes
+
+              Write-Host ""
+              Write-Host "Configuration: $($item.id)"
+              Write-Host "  Sequence:       $($detail.configuration.sequence_number)"
+              Write-Host "  Status:         $($detail.configuration.status)"
+              Write-Host "  Commit SHA:     $($ingress.commit_sha)"
+              Write-Host "  Commit message: $($ingress.commit_message)"
+              Write-Host "  Branch:         '$($ingress.branch)'"
+              Write-Host "  Default branch: $($ingress.on_default_branch)"
+              Write-Host "  Pull request:   $($ingress.is_pull_request)"
+
+              if ($ingress.commit_sha -eq $commit) {
+                $matchingConfigurations += [PSCustomObject]@{
+                  Id     = $item.id
+                  Detail = $detail
+                }
+              }
             }
+
+            if ($matchingConfigurations.Count -gt 0) {
+              # If multiple configurations match, use the highest sequence.
+              $configuration = $matchingConfigurations |
+                Sort-Object { [int]$_.Detail.configuration.sequence_number } -Descending |
+                Select-Object -First 1
+
+              break
+            }
+
+            Write-Host "No configuration matches commit '$commit' yet."
+            Start-Sleep -Seconds 10
           }
 
-          if ($matchingConfigurations.Count -eq 0) {
-            throw @"
-          No Stack configuration matches the GitHub commit.
-
-          Tag:    $tag
-          Ref:    $ref
-          Commit: $commit
-
-          Review the configuration metadata printed above.
-          "@
+          if (-not $configuration) {
+            throw "No Stack configuration appeared for tag '$tag' and commit '$commit' within 10 minutes."
           }
 
-          # If HCP has multiple configurations for the same commit,
-          # use the most recent configuration sequence.
-          $configuration = $matchingConfigurations |
-            Sort-Object { [int]$_.configuration.sequence_number } -Descending |
-            Select-Object -First 1
-
-          $configurationId = $configuration.configuration.id
-          $configurationStatus = $configuration.configuration.status
+          $configurationId = $configuration.Id
 
           Write-Host ""
           Write-Host "Matched Stack configuration:"
           Write-Host "  ID:       $configurationId"
-          Write-Host "  Sequence: $($configuration.configuration.sequence_number)"
-          Write-Host "  Status:   $configurationStatus"
+          Write-Host "  Sequence: $($configuration.Detail.configuration.sequence_number)"
+          Write-Host "  Status:   $($configuration.Detail.configuration.status)"
 
-          if ($configurationStatus -ne "completed") {
-            throw "Matched configuration '$configurationId' has status '$configurationStatus'."
+          # Wait for HCP to finish preparing this configuration.
+          while ([DateTimeOffset]::UtcNow -lt $configurationDeadline) {
+            $detail = Invoke-TerraformJson @(
+              "configuration",
+              "show",
+              "-configuration-id",
+              $configurationId,
+              "-json"
+            )
+
+            $configurationStatus = $detail.configuration.status
+
+            Write-Host "Configuration '$configurationId': $configurationStatus"
+
+            if ($configurationStatus -eq "completed") {
+              $configuration.Detail = $detail
+              break
+            }
+
+            if ($configurationStatus -in @(
+              "errored",
+              "failed",
+              "canceled",
+              "cancelled"
+            )) {
+              throw "Configuration '$configurationId' preparation failed with status '$configurationStatus'."
+            }
+
+            Start-Sleep -Seconds 10
           }
+
+          if ($configuration.Detail.configuration.status -ne "completed") {
+            throw "Timed out after 10 minutes waiting for configuration '$configurationId' to finish preparing."
+          }
+
+          Write-Host "Configuration preparation completed."
 
           # List deployment groups belonging to the matched configuration.
           $groupResponse = Invoke-TerraformJson @(
@@ -252,7 +288,7 @@ jobs:
 
           # Wait up to 10 minutes for the deployment run to succeed.
           # Pending operator approval is not automatically approved.
-          $deadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
+          $deploymentDeadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
 
           $failureStatuses = @(
             "failed",
@@ -263,7 +299,7 @@ jobs:
           )
 
           while ($true) {
-            if ([DateTimeOffset]::UtcNow -ge $deadline) {
+            if ([DateTimeOffset]::UtcNow -ge $deploymentDeadline) {
               throw "Timed out after 10 minutes waiting for deployment run '$deploymentRunId'. Last status: '$($deploymentRun.status)'."
             }
 
