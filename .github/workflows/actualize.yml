@@ -26,8 +26,15 @@ jobs:
     env:
       HCP_STACK_ID: ${{ vars.SOLUTION_ACTUALIZATION_STACK_ID }}
       HCP_TOKEN_SECRET_ID: ${{ vars.AMIASEA_TFE_TOKEN_VERSIONLESS_ID }}
+      GITHUB_EVENT_AFTER: ${{ github.event.after }}
 
     steps:
+      - name: Install Terraform CLI
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+          terraform_wrapper: false
+
       - name: Authenticate to Azure using OIDC
         uses: azure/login@v3.1.0
         with:
@@ -56,8 +63,9 @@ jobs:
           Write-Output "::add-mask::$token"
 
           "HCP_TOKEN=$token" >> $env:GITHUB_ENV
+          "TF_TOKEN_app_terraform_io=$token" >> $env:GITHUB_ENV
 
-      - name: Wait for Stack deployment and retrieve outputs
+      - name: Inspect Stack configuration and wait for deployment
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -70,83 +78,180 @@ jobs:
             throw "Failed to retrieve the HCP Terraform token."
           }
 
-          $api = "https://app.terraform.io/api/v2"
+          function Invoke-TerraformJson {
+            param(
+              [Parameter(Mandatory)]
+              [string[]]$Arguments
+            )
+
+            Write-Host "terraform stacks $($Arguments -join ' ')"
+
+            $output = & terraform stacks @Arguments
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+              throw "Terraform Stacks CLI failed with exit code $exitCode."
+            }
+
+            $json = ($output | Out-String).Trim()
+
+            if (-not $json) {
+              throw "Terraform Stacks CLI returned empty JSON output."
+            }
+
+            return ($json | ConvertFrom-Json -Depth 100)
+          }
+
           $tag = $env:GITHUB_REF_NAME
-          $commit = $env.GITHUB_SHA
+          $ref = $env:GITHUB_REF
+          $refType = $env:GITHUB_REF_TYPE
+          $commit = $env:GITHUB_SHA
+          $eventAfter = $env:GITHUB_EVENT_AFTER
 
-          $headers = @{
-            Authorization = "Bearer $env:HCP_TOKEN"
-            Accept        = "application/vnd.api+json"
+          Write-Host ""
+          Write-Host "GitHub event:"
+          Write-Host "  Ref:         $ref"
+          Write-Host "  Ref type:    $refType"
+          Write-Host "  Tag:         $tag"
+          Write-Host "  GitHub SHA:  $commit"
+          Write-Host "  Event after: $eventAfter"
+
+          if ($refType -ne "tag") {
+            throw "Expected a tag event; received ref type '$refType'."
           }
 
-          function Get-HcpResource {
-            param([string]$Path)
-
-            Invoke-RestMethod `
-              -Method Get `
-              -Uri "$api$Path" `
-              -Headers $headers
+          if ($eventAfter -and $eventAfter -ne $commit) {
+            throw "GitHub SHA '$commit' does not match event.after '$eventAfter'."
           }
 
-          Write-Host "Tag: $tag"
-          Write-Host "Commit: $commit"
+          # List every configuration associated with this Stack.
+          $configurationList = Invoke-TerraformJson @(
+            "configuration",
+            "list",
+            "-stack-id",
+            $env:HCP_STACK_ID,
+            "-json"
+          )
 
-          # Allow HCP Terraform time to register the VCS tag event.
-          Start-Sleep -Seconds 10
+          $configurations = @($configurationList.configurations)
 
-          # Find the Stack configuration created from this exact tag and commit.
-          $response = Get-HcpResource `
-            "/stacks/$env:HCP_STACK_ID/stack-configurations?include=ingress_attributes&page%5Bsize%5D=100"
+          if ($configurations.Count -eq 0) {
+            throw "No configurations exist for Stack '$env:HCP_STACK_ID'."
+          }
 
-          $configuration = $null
+          Write-Host ""
+          Write-Host "Inspecting $($configurations.Count) Stack configurations:"
 
-          foreach ($candidate in $response.data) {
-            $ingressId = $candidate.relationships.'ingress-attributes'.data.id
+          $matchingConfigurations = @()
 
-            if (-not $ingressId) {
-              continue
+          foreach ($item in $configurations) {
+            $detail = Invoke-TerraformJson @(
+              "configuration",
+              "show",
+              "-configuration-id",
+              $item.id,
+              "-json"
+            )
+
+            $ingress = $detail.ingress_attributes
+
+            Write-Host ""
+            Write-Host "Configuration: $($item.id)"
+            Write-Host "  Sequence:       $($detail.configuration.sequence_number)"
+            Write-Host "  Status:         $($detail.configuration.status)"
+            Write-Host "  Commit SHA:     $($ingress.commit_sha)"
+            Write-Host "  Commit message: $($ingress.commit_message)"
+            Write-Host "  Branch:         '$($ingress.branch)'"
+            Write-Host "  Default branch: $($ingress.on_default_branch)"
+            Write-Host "  Pull request:   $($ingress.is_pull_request)"
+
+            if ($ingress.commit_sha -eq $commit) {
+              $matchingConfigurations += $detail
             }
-
-            $ingress = $response.included |
-              Where-Object { $_.id -eq $ingressId } |
-              Select-Object -First 1
-
-            if (
-              $ingress.attributes.tag -eq $tag -and
-              $ingress.attributes.'commit-sha' -eq $commit
-            ) {
-              $configuration = $candidate
-              break
-            }
           }
 
-          if (-not $configuration) {
-            throw "No Stack configuration exists for tag '$tag' and commit '$commit'."
+          if ($matchingConfigurations.Count -eq 0) {
+            throw @"
+          No Stack configuration matches the GitHub commit.
+
+          Tag:    $tag
+          Ref:    $ref
+          Commit: $commit
+
+          Review the configuration metadata printed above.
+          "@
           }
 
-          Write-Host "Found Stack configuration: $($configuration.id)"
+          # If HCP has multiple configurations for the same commit,
+          # use the most recent configuration sequence.
+          $configuration = $matchingConfigurations |
+            Sort-Object { [int]$_.configuration.sequence_number } -Descending |
+            Select-Object -First 1
 
-          if ($configuration.attributes.status -eq "errored") {
-            throw "Stack configuration preparation failed: $($configuration.id)"
+          $configurationId = $configuration.configuration.id
+          $configurationStatus = $configuration.configuration.status
+
+          Write-Host ""
+          Write-Host "Matched Stack configuration:"
+          Write-Host "  ID:       $configurationId"
+          Write-Host "  Sequence: $($configuration.configuration.sequence_number)"
+          Write-Host "  Status:   $configurationStatus"
+
+          if ($configurationStatus -ne "completed") {
+            throw "Matched configuration '$configurationId' has status '$configurationStatus'."
           }
 
-          # Find the latest solutions deployment run already associated with this configuration.
-          $runs = Get-HcpResource `
-            "/stack-configurations/$($configuration.id)/stack-deployment-runs?page%5Bsize%5D=100"
+          # List deployment groups belonging to the matched configuration.
+          $groupResponse = Invoke-TerraformJson @(
+            "deployment-group",
+            "list",
+            "-configuration-id",
+            $configurationId,
+            "-json"
+          )
 
-          $deploymentRun = $runs.data |
-            Where-Object { $_.attributes.deployment -eq "solutions" } |
+          $deploymentGroup = @($groupResponse.deployment_groups) |
+            Where-Object { $_.name -eq "solutions_default" } |
+            Select-Object -First 1
+
+          if (-not $deploymentGroup) {
+            throw "No solutions_default deployment group exists for configuration '$configurationId'."
+          }
+
+          $deploymentGroupId = $deploymentGroup.id
+
+          Write-Host ""
+          Write-Host "Deployment group:"
+          Write-Host "  ID:     $deploymentGroupId"
+          Write-Host "  Name:   $($deploymentGroup.name)"
+          Write-Host "  Status: $($deploymentGroup.status)"
+
+          # List deployment runs associated with this deployment group.
+          $runResponse = Invoke-TerraformJson @(
+            "deployment-run",
+            "list",
+            "-deployment-group-id",
+            $deploymentGroupId,
+            "-json"
+          )
+
+          $deploymentRun = @($runResponse.deployment_runs) |
+            Sort-Object { [DateTimeOffset]::Parse($_.created_at) } -Descending |
             Select-Object -First 1
 
           if (-not $deploymentRun) {
-            throw "No existing solutions deployment run was found for configuration '$($configuration.id)'."
+            throw "No deployment run exists for deployment group '$deploymentGroupId'."
           }
 
           $deploymentRunId = $deploymentRun.id
 
-          Write-Host "Found solutions deployment run: $deploymentRunId"
+          Write-Host ""
+          Write-Host "Deployment run:"
+          Write-Host "  ID:     $deploymentRunId"
+          Write-Host "  Status: $($deploymentRun.status)"
 
-          # Wait up to 10 minutes for this run to reach a terminal state.
+          # Wait up to 10 minutes for the deployment run to succeed.
+          # Pending operator approval is not automatically approved.
           $deadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
 
           $failureStatuses = @(
@@ -159,29 +264,52 @@ jobs:
 
           while ($true) {
             if ([DateTimeOffset]::UtcNow -ge $deadline) {
-              throw "Timed out after 10 minutes waiting for deployment run '$deploymentRunId'."
+              throw "Timed out after 10 minutes waiting for deployment run '$deploymentRunId'. Last status: '$($deploymentRun.status)'."
             }
 
-            $runResponse = Get-HcpResource "/stack-deployment-runs/$deploymentRunId"
-            $status = $runResponse.data.attributes.status
+            $runResponse = Invoke-TerraformJson @(
+              "deployment-run",
+              "list",
+              "-deployment-group-id",
+              $deploymentGroupId,
+              "-json"
+            )
 
-            Write-Host "Deployment run: $deploymentRunId"
-            Write-Host "Status: $status"
+            $currentRun = @($runResponse.deployment_runs) |
+              Where-Object { $_.id -eq $deploymentRunId } |
+              Select-Object -First 1
+
+            if (-not $currentRun) {
+              throw "Deployment run '$deploymentRunId' disappeared from its deployment group."
+            }
+
+            $status = $currentRun.status
+
+            Write-Host "Deployment run '$deploymentRunId': $status"
 
             if ($status -eq "succeeded") {
               break
             }
 
             if ($status -in $failureStatuses) {
-              throw "Stack deployment ended with status: $status"
+              throw "Stack deployment ended with status '$status'."
             }
 
             Start-Sleep -Seconds 15
           }
 
+          Write-Host ""
           Write-Host "Stack deployment succeeded."
 
           # Retrieve the Stack's latest aggregated output summary.
+          # The Stacks CLI does not currently expose this output summary.
+          $api = "https://app.terraform.io/api/v2"
+
+          $headers = @{
+            Authorization = "Bearer $env:HCP_TOKEN"
+            Accept        = "application/vnd.api+json"
+          }
+
           $outputPath = Join-Path $env:GITHUB_WORKSPACE "solution-variety-topologies.json"
 
           Invoke-WebRequest `
@@ -193,15 +321,16 @@ jobs:
             throw "The Stack output summary was empty or was not created."
           }
 
-          # Verify that the response is JSON and display it for inspection.
-          $outputs = Get-Content $outputPath -Raw | ConvertFrom-Json
+          $outputs = Get-Content $outputPath -Raw | ConvertFrom-Json -Depth 100
 
+          Write-Host ""
           Write-Host "Retrieved Stack output summary:"
           $outputs | ConvertTo-Json -Depth 100 | Write-Host
 
           "stack_tag=$tag" >> $env:GITHUB_OUTPUT
           "commit_sha=$commit" >> $env:GITHUB_OUTPUT
-          "configuration_id=$($configuration.id)" >> $env:GITHUB_OUTPUT
+          "configuration_id=$configurationId" >> $env:GITHUB_OUTPUT
+          "deployment_group_id=$deploymentGroupId" >> $env:GITHUB_OUTPUT
           "deployment_run_id=$deploymentRunId" >> $env:GITHUB_OUTPUT
 
       - name: Upload Stack output summary
