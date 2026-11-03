@@ -8,7 +8,6 @@ store "varset" "this" {
 }
 
 deployment "solutions" {
-  destroy = true
   inputs = {
     github_organization_name = "amiasea"
 
