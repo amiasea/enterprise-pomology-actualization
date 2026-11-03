@@ -3,7 +3,7 @@ output "pomologies" {
 
   value = {
     for solution_name, asset in data.github_release_asset.pomologies :
-    solution_name => jsondecode(asset.file_contents)
+    solution_name => jsondecode(base64decode(asset.file_contents))
   }
 }
 

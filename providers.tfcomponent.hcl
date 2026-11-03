@@ -25,6 +25,10 @@ provider "github" "this" {
 provider "aws" "this" {
   config {
     region = "us-east-1"
-    profile = "amiasea"
+
+    assume_role_with_web_identity {
+      role_arn           = var.solution_actualization_role_arn
+      web_identity_token = var.aws_identity_token
+    }
   }
 }

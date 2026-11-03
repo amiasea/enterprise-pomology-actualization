@@ -14,7 +14,7 @@ component "solution_definitions" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.0"
+  version = "1.0.1"
 
   for_each = component.solution_definitions.pomologies
 
@@ -76,7 +76,7 @@ locals {
   }
 }
 
-component "solution_aspect_option_aws_artifacts" {
+component "solution_aspect_options_aws_artifacts" {
   source   = "./modules/solution_aspect_options_aws_artifacts"
   for_each = component.solution_definitions.pomologies
 
@@ -111,6 +111,8 @@ component "aws_artifact_publish_access" {
     codeartifact_package_arns = values(each.value.codeartifact_package_arns)
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
+
+    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
 
   providers = {
@@ -136,6 +138,8 @@ component "aws_artifact_restore_access" {
     codeartifact_package_arns = values(each.value.codeartifact_package_arns)
 
     ecr_repository_arns = values(each.value.ecr_repository_arns)
+
+    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
 
   providers = {
