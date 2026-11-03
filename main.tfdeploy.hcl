@@ -25,6 +25,6 @@ deployment "solutions" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = "v1.0.3"
+    solution_definitions_release_tag = "v1.0.4"
   }
 }
