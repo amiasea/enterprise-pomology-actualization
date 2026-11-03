@@ -28,3 +28,9 @@ deployment "solutions" {
     solution_definitions_release_tag = "v1.0.4"
   }
 }
+
+publish_output "solution_variety_topologies" {
+  description = "Actualized repository topology partitioned by solution and variety."
+
+  value = deployment.solutions.solution_variety_topologies
+}
