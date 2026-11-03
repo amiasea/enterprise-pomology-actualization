@@ -1,3 +1,4 @@
+
 name: Actualize enterprise solutions
 
 on:
@@ -18,7 +19,7 @@ jobs:
   actualize:
     name: Actualize and retrieve topology
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
 
     # Provides a stable OIDC subject for the Azure federated credential.
     # environment: institutive
@@ -102,6 +103,76 @@ jobs:
             return ($json | ConvertFrom-Json -Depth 100)
           }
 
+          function Invoke-TerraformWatch {
+            param(
+              [Parameter(Mandatory)]
+              [string[]]$Arguments,
+
+              [Parameter(Mandatory)]
+              [int]$TimeoutSeconds
+            )
+
+            $command = "terraform stacks $($Arguments -join ' ')"
+
+            Write-Host ""
+            Write-Host "Starting: $command"
+            Write-Host "Timeout: $TimeoutSeconds seconds"
+
+            $stdoutPath = Join-Path $env:RUNNER_TEMP "$([guid]::NewGuid()).stdout"
+            $stderrPath = Join-Path $env:RUNNER_TEMP "$([guid]::NewGuid()).stderr"
+
+            try {
+              $process = Start-Process `
+                -FilePath (Get-Command terraform).Source `
+                -ArgumentList $Arguments `
+                -NoNewWindow `
+                -PassThru `
+                -RedirectStandardOutput $stdoutPath `
+                -RedirectStandardError $stderrPath
+
+              $completed = $process.WaitForExit($TimeoutSeconds * 1000)
+
+              if (-not $completed) {
+                Write-Host "Watcher timed out. Terminating process."
+
+                try {
+                  $process.Kill($true)
+                  $process.WaitForExit()
+                }
+                catch {
+                  Write-Host "Unable to terminate watcher cleanly: $_"
+                }
+
+                if (Test-Path $stdoutPath) {
+                  Get-Content $stdoutPath | Write-Host
+                }
+
+                if (Test-Path $stderrPath) {
+                  Get-Content $stderrPath | Write-Host
+                }
+
+                throw "Timed out after $TimeoutSeconds seconds running '$command'."
+              }
+
+              $process.WaitForExit()
+
+              if (Test-Path $stdoutPath) {
+                Get-Content $stdoutPath | Write-Host
+              }
+
+              if (Test-Path $stderrPath) {
+                Get-Content $stderrPath | Write-Host
+              }
+
+              if ($process.ExitCode -ne 0) {
+                throw "'$command' exited with code $($process.ExitCode)."
+              }
+            }
+            finally {
+              Remove-Item $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+            }
+          }
+
           $tag = $env:GITHUB_REF_NAME
           $ref = $env:GITHUB_REF
           $refType = $env:GITHUB_REF_TYPE
@@ -124,8 +195,8 @@ jobs:
             throw "GitHub SHA '$commit' does not match event.after '$eventAfter'."
           }
 
-                    # Discover the Stack configuration for this exact GitHub commit.
-          # HCP may take time to register and prepare a new configuration.
+          # Discover the Stack configuration for this exact GitHub commit.
+          # HCP may take time to register a new configuration.
 
           $configurationDeadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
           $configuration = $null
@@ -200,39 +271,29 @@ jobs:
           Write-Host "  Sequence: $($configuration.Detail.configuration.sequence_number)"
           Write-Host "  Status:   $($configuration.Detail.configuration.status)"
 
-          # Wait for HCP to finish preparing this configuration.
-          while ([DateTimeOffset]::UtcNow -lt $configurationDeadline) {
-            $detail = Invoke-TerraformJson @(
-              "configuration",
-              "show",
-              "-configuration-id",
-              $configurationId,
-              "-json"
-            )
+          # Let the Stacks CLI watch configuration preparation.
+          Invoke-TerraformWatch @(
+            "stacks",
+            "configuration",
+            "watch",
+            "-configuration-id",
+            $configurationId,
+            "-no-color=true"
+          ) -TimeoutSeconds 600
 
-            $configurationStatus = $detail.configuration.status
+          # Verify the final configuration status.
+          $configurationDetail = Invoke-TerraformJson @(
+            "configuration",
+            "show",
+            "-configuration-id",
+            $configurationId,
+            "-json"
+          )
 
-            Write-Host "Configuration '$configurationId': $configurationStatus"
+          $configurationStatus = $configurationDetail.configuration.status
 
-            if ($configurationStatus -eq "completed") {
-              $configuration.Detail = $detail
-              break
-            }
-
-            if ($configurationStatus -in @(
-              "errored",
-              "failed",
-              "canceled",
-              "cancelled"
-            )) {
-              throw "Configuration '$configurationId' preparation failed with status '$configurationStatus'."
-            }
-
-            Start-Sleep -Seconds 10
-          }
-
-          if ($configuration.Detail.configuration.status -ne "completed") {
-            throw "Timed out after 10 minutes waiting for configuration '$configurationId' to finish preparing."
+          if ($configurationStatus -ne "completed") {
+            throw "Configuration '$configurationId' finished watching with status '$configurationStatus'."
           }
 
           Write-Host "Configuration preparation completed."
@@ -262,7 +323,7 @@ jobs:
           Write-Host "  Name:   $($deploymentGroup.name)"
           Write-Host "  Status: $($deploymentGroup.status)"
 
-          # List deployment runs associated with this deployment group.
+          # Find the latest deployment run associated with the group.
           $runResponse = Invoke-TerraformJson @(
             "deployment-run",
             "list",
@@ -286,52 +347,36 @@ jobs:
           Write-Host "  ID:     $deploymentRunId"
           Write-Host "  Status: $($deploymentRun.status)"
 
-          # Wait up to 10 minutes for the deployment run to succeed.
-          # Pending operator approval is not automatically approved.
-          $deploymentDeadline = [DateTimeOffset]::UtcNow.AddMinutes(10)
+          # Let the Stacks CLI watch the deployment run.
+          # Pending operator approval remains an operator decision.
+          Invoke-TerraformWatch @(
+            "stacks",
+            "deployment-run",
+            "watch",
+            "-deployment-run-id",
+            $deploymentRunId,
+            "-no-color=true"
+          ) -TimeoutSeconds 600
 
-          $failureStatuses = @(
-            "failed",
-            "errored",
-            "abandoned",
-            "canceled",
-            "cancelled"
+          # Verify the final deployment status.
+          $runResponse = Invoke-TerraformJson @(
+            "deployment-run",
+            "list",
+            "-deployment-group-id",
+            $deploymentGroupId,
+            "-json"
           )
 
-          while ($true) {
-            if ([DateTimeOffset]::UtcNow -ge $deploymentDeadline) {
-              throw "Timed out after 10 minutes waiting for deployment run '$deploymentRunId'. Last status: '$($deploymentRun.status)'."
-            }
+          $currentRun = @($runResponse.deployment_runs) |
+            Where-Object { $_.id -eq $deploymentRunId } |
+            Select-Object -First 1
 
-            $runResponse = Invoke-TerraformJson @(
-              "deployment-run",
-              "list",
-              "-deployment-group-id",
-              $deploymentGroupId,
-              "-json"
-            )
+          if (-not $currentRun) {
+            throw "Deployment run '$deploymentRunId' disappeared from its deployment group."
+          }
 
-            $currentRun = @($runResponse.deployment_runs) |
-              Where-Object { $_.id -eq $deploymentRunId } |
-              Select-Object -First 1
-
-            if (-not $currentRun) {
-              throw "Deployment run '$deploymentRunId' disappeared from its deployment group."
-            }
-
-            $status = $currentRun.status
-
-            Write-Host "Deployment run '$deploymentRunId': $status"
-
-            if ($status -eq "succeeded") {
-              break
-            }
-
-            if ($status -in $failureStatuses) {
-              throw "Stack deployment ended with status '$status'."
-            }
-
-            Start-Sleep -Seconds 15
+          if ($currentRun.status -ne "succeeded") {
+            throw "Deployment run '$deploymentRunId' finished watching with status '$($currentRun.status)'."
           }
 
           Write-Host ""
