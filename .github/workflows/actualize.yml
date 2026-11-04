@@ -501,23 +501,13 @@ jobs:
               organization = "amiasea"
               solution = $env:SOLUTION_NAME
               variety = $env:VARIETY_NAME
-              release = $solution.definition_release
+              tag = $solution.definition_release
             }
 
             topology = $variety
-
-            provenance = [ordered]@{
-              repository = $env:GITHUB_REPOSITORY
-              workflow = $env:GITHUB_WORKFLOW_REF
-              workflow_run_id = $env:GITHUB_RUN_ID
-              workflow_run_attempt = $env:GITHUB_RUN_ATTEMPT
-              commit = $env:GITHUB_SHA
-              tag = $env:GITHUB_REF_NAME
-              stack_id = "st-gzVxTc6CDzmGvN3J"
-            }
           }
 
-          $predicatePath = Join-Path $outputPath "predicate.json"
+          $predicatePath = Join-Path $outputPath "variety-predicate.json"
 
           $predicate |
             ConvertTo-Json -Depth 100 |
@@ -526,7 +516,7 @@ jobs:
           "subject_digest=$subjectDigest" >> $env:GITHUB_OUTPUT
           "predicate_path=$predicatePath" >> $env:GITHUB_OUTPUT
 
-          Write-Host "Prepared predicate for $env:SUBJECT_NAME."
+          Write-Host "Prepared variety predicate for $env:SUBJECT_NAME."
 
       - name: Create signed variety attestation
         uses: actions/attest@v4.2.2
@@ -535,3 +525,9 @@ jobs:
           subject-digest: ${{ steps.predicate.outputs.subject_digest }}
           predicate-type: https://amiasea.dev/attestation/variety/v1
           predicate-path: ${{ steps.predicate.outputs.predicate_path }}
+
+      - name: Create signed SLSA provenance attestation
+        uses: actions/attest@v4.2.2
+        with:
+          subject-name: ${{ matrix.subject_name }}
+          subject-digest: ${{ steps.predicate.outputs.subject_digest }}
