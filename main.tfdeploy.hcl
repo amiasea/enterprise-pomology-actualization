@@ -54,14 +54,14 @@ deployment "solutions_test" {
   }
 }
 
-publish_output "solution_variety_topologies" {
-  description = "Actualized repository topology partitioned by solution and variety."
+# publish_output "solution_variety_topologies" {
+#   description = "Actualized repository topology partitioned by solution and variety."
 
-  value = deployment.solutions.solution_variety_topologies
-}
+#   value = deployment.solutions.solution_variety_topologies
+# }
 
-publish_output "solution_variety_topologies_test" {
-  description = "Actualized repository topology partitioned by solution and variety for integration testing."
+# publish_output "solution_variety_topologies_test" {
+#   description = "Actualized repository topology partitioned by solution and variety for integration testing."
 
-  value = deployment.solutions_test.solution_variety_topologies
-}
+#   value = deployment.solutions_test.solution_variety_topologies
+# }
