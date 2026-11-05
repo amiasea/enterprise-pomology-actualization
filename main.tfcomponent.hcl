@@ -14,7 +14,7 @@ component "solution_definitions" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.2"
+  version = "1.0.3"
 
   for_each = component.solution_definitions.pomologies
 

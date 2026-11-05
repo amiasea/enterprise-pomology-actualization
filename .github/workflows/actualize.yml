@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
   id-token: write
+  attestations: write
+  artifact-metadata: write
 
 # Avoid overlapping actualization workflows.
 concurrency:
@@ -376,3 +378,148 @@ jobs:
           path: solution-variety-topologies.json
           if-no-files-found: error
           retention-days: 7
+  
+  prepare-attestations:
+    name: Prepare solution variety attestations
+    runs-on: ubuntu-latest
+    needs: actualize
+    timeout-minutes: 5
+
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Download Stack output summary
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: solution-variety-topologies
+          path: topology
+
+      - name: Generate attestation matrix
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact="topology/solution-variety-topologies.json"
+
+          if [[ ! -f "$artifact" ]]; then
+            echo "Stack topology artifact was not found."
+            exit 1
+          fi
+
+          matrix=$(jq -c '
+            [
+              .published_outputs.solution_variety_topologies.value
+              | to_entries[]
+              | {
+                  solution_name: .key,
+                  subject_name: ("amiasea-" + .key)
+                }
+            ]
+          ' "$artifact")
+
+          if [[ "$matrix" == "[]" ]]; then
+            echo "No solutions were found."
+            exit 1
+          fi
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+          echo "Prepared $(jq 'length' <<< "$matrix") solution attestations."
+
+  attest:
+    name: Attest ${{ matrix.subject_name }}
+    runs-on: ubuntu-latest
+    needs:
+      - actualize
+      - prepare-attestations
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare-attestations.outputs.matrix) }}
+
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Download Stack output summary
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: solution-variety-topologies
+          path: topology
+
+      - name: Generate solution predicate
+        id: predicate
+        shell: pwsh
+        env:
+          SOLUTION_NAME: ${{ matrix.solution_name }}
+          SUBJECT_NAME: ${{ matrix.subject_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $artifactPath = Join-Path $env:GITHUB_WORKSPACE "topology/solution-variety-topologies.json"
+          $outputPath = Join-Path $env:GITHUB_WORKSPACE "attestations"
+
+          if (-not (Test-Path $artifactPath)) {
+            throw "Stack topology artifact was not found."
+          }
+
+          $summary = Get-Content $artifactPath -Raw | ConvertFrom-Json -Depth 100
+          $solutions = $summary.published_outputs.solution_variety_topologies.value
+
+          $solution = $solutions.PSObject.Properties[$env:SOLUTION_NAME].Value
+
+          if (-not $solution) {
+            throw "Solution '$env:SOLUTION_NAME' was not found."
+          }
+
+          if (-not $solution.varieties -or $solution.varieties.PSObject.Properties.Count -eq 0) {
+            throw "Solution '$env:SOLUTION_NAME' contains no actualized varieties."
+          }
+
+          New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+
+          $subjectBytes = [System.Text.Encoding]::UTF8.GetBytes($env:SUBJECT_NAME)
+          $subjectHash = [System.Security.Cryptography.SHA256]::HashData($subjectBytes)
+          $subjectDigest = "sha256:$([Convert]::ToHexString($subjectHash).ToLowerInvariant())"
+
+          $predicate = [ordered]@{
+            definition = [ordered]@{
+              organization = "amiasea"
+              solution = $env:SOLUTION_NAME
+              tag = $solution.definition_release
+            }
+
+            varieties = $solution.varieties
+          }
+
+          $predicatePath = Join-Path $outputPath "solution-predicate.json"
+
+          $predicate |
+            ConvertTo-Json -Depth 100 |
+            Set-Content -Path $predicatePath -Encoding utf8
+
+          "subject_digest=$subjectDigest" >> $env:GITHUB_OUTPUT
+          "predicate_path=$predicatePath" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Prepared solution predicate for $env:SUBJECT_NAME."
+
+      - name: Create signed solution attestation
+        uses: actions/attest@v4.2.2
+        with:
+          subject-name: ${{ matrix.subject_name }}
+          subject-digest: ${{ steps.predicate.outputs.subject_digest }}
+          predicate-type: https://amiasea.dev/attestation/variety/v1
+          predicate-path: ${{ steps.predicate.outputs.predicate_path }}
+
+      - name: Create signed SLSA provenance attestation
+        uses: actions/attest@v4.2.2
+        with:
+          subject-name: ${{ matrix.subject_name }}
+          subject-digest: ${{ steps.predicate.outputs.subject_digest }}
