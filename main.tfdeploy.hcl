@@ -27,7 +27,7 @@ deployment "solutions" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = store.varset.control_plane.solution_definitions_release_tag
+    solution_definitions_release_tag = store.varset.this.solution_definitions_release_tag
   }
 }
 
@@ -50,16 +50,16 @@ deployment "solutions_test" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = store.varset.control_plane.solution_definitions_test_release_tag
+    solution_definitions_release_tag = store.varset.this.solution_definitions_test_release_tag
   }
 }
 
 publish_output "solution_definitions_release_tag" {
-  value = store.varset.control_plane.solution_definitions_release_tag
+  value = store.varset.this.solution_definitions_release_tag
 }
 
 publish_output "solution_definitions_test_release_tag" {
-  value = store.varset.control_plane.solution_definitions_test_release_tag
+  value = store.varset.this.solution_definitions_test_release_tag
 }
 
 publish_output "solution_variety_topologies" {
