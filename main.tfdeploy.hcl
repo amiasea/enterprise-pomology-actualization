@@ -27,7 +27,7 @@ deployment "solutions" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = "v1.0.4"
+    solution_definitions_release_tag = store.varset.control_plane.solution_definitions_release_tag
   }
 }
 
@@ -50,15 +50,23 @@ deployment "solutions_test" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = "v1.0.0-test"
+    solution_definitions_release_tag = store.varset.control_plane.solution_definitions_test_release_tag
   }
 }
 
-# publish_output "solution_variety_topologies" {
-#   description = "Actualized repository topology partitioned by solution and variety."
+publish_output "solution_definitions_release_tag" {
+  value = store.varset.control_plane.solution_definitions_release_tag
+}
 
-#   value = deployment.solutions.solution_variety_topologies
-# }
+publish_output "solution_definitions_test_release_tag" {
+  value = store.varset.control_plane.solution_definitions_test_release_tag
+}
+
+publish_output "solution_variety_topologies" {
+  description = "Actualized repository topology partitioned by solution and variety."
+
+  value = deployment.solutions.destroy ? null : deployment.solutions.solution_variety_topologies
+}
 
 # publish_output "solution_variety_topologies_test" {
 #   description = "Actualized repository topology partitioned by solution and variety for integration testing."
