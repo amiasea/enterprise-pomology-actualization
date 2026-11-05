@@ -380,7 +380,7 @@ jobs:
           retention-days: 7
   
   prepare-attestations:
-    name: Prepare variety attestations
+    name: Prepare solution variety attestations
     runs-on: ubuntu-latest
     needs: actualize
     timeout-minutes: 5
@@ -412,25 +412,21 @@ jobs:
             [
               .published_outputs.solution_variety_topologies.value
               | to_entries[]
-              | .key as $solution
-              | .value.varieties
-              | to_entries[]
               | {
-                  solution_name: $solution,
-                  variety_name: .key,
-                  subject_name: ("amiasea-" + $solution + "-" + .key)
+                  solution_name: .key,
+                  subject_name: ("amiasea-" + .key)
                 }
             ]
           ' "$artifact")
 
           if [[ "$matrix" == "[]" ]]; then
-            echo "No solution varieties were found."
+            echo "No solutions were found."
             exit 1
           fi
 
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-          echo "Prepared $(jq 'length' <<< "$matrix") variety attestations."
+          echo "Prepared $(jq 'length' <<< "$matrix") solution attestations."
 
   attest:
     name: Attest ${{ matrix.subject_name }}
@@ -458,12 +454,11 @@ jobs:
           name: solution-variety-topologies
           path: topology
 
-      - name: Generate variety predicate
+      - name: Generate solution predicate
         id: predicate
         shell: pwsh
         env:
           SOLUTION_NAME: ${{ matrix.solution_name }}
-          VARIETY_NAME: ${{ matrix.variety_name }}
           SUBJECT_NAME: ${{ matrix.subject_name }}
         run: |
           $ErrorActionPreference = "Stop"
@@ -484,10 +479,8 @@ jobs:
             throw "Solution '$env:SOLUTION_NAME' was not found."
           }
 
-          $variety = $solution.varieties.PSObject.Properties[$env:VARIETY_NAME].Value
-
-          if (-not $variety) {
-            throw "Variety '$env:VARIETY_NAME' was not found in solution '$env:SOLUTION_NAME'."
+          if (-not $solution.varieties -or $solution.varieties.PSObject.Properties.Count -eq 0) {
+            throw "Solution '$env:SOLUTION_NAME' contains no actualized varieties."
           }
 
           New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
@@ -500,14 +493,13 @@ jobs:
             definition = [ordered]@{
               organization = "amiasea"
               solution = $env:SOLUTION_NAME
-              variety = $env:VARIETY_NAME
               tag = $solution.definition_release
             }
 
-            topology = $variety
+            varieties = $solution.varieties
           }
 
-          $predicatePath = Join-Path $outputPath "variety-predicate.json"
+          $predicatePath = Join-Path $outputPath "solution-predicate.json"
 
           $predicate |
             ConvertTo-Json -Depth 100 |
@@ -516,9 +508,9 @@ jobs:
           "subject_digest=$subjectDigest" >> $env:GITHUB_OUTPUT
           "predicate_path=$predicatePath" >> $env:GITHUB_OUTPUT
 
-          Write-Host "Prepared variety predicate for $env:SUBJECT_NAME."
+          Write-Host "Prepared solution predicate for $env:SUBJECT_NAME."
 
-      - name: Create signed variety attestation
+      - name: Create signed solution attestation
         uses: actions/attest@v4.2.2
         with:
           subject-name: ${{ matrix.subject_name }}
