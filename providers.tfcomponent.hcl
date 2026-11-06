@@ -10,13 +10,25 @@ required_providers {
   }
 }
 
-provider "github" "this" {
+provider "github" "amiasea" {
   config {
     owner = var.github_organization_name
 
     app_auth {
       id              = var.gha_id
       installation_id = var.gha_installation_id
+      pem_file        = var.gha_pem_file
+    }
+  }
+}
+
+provider "github" "amiasea_enterprise_solution" {
+  config {
+    owner = var.enterprise_solution_github_organization_name
+
+    app_auth {
+      id              = var.gha_id
+      installation_id = var.enterprise_solution_gha_installation_id
       pem_file        = var.gha_pem_file
     }
   }

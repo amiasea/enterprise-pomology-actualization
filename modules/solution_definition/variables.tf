@@ -5,13 +5,13 @@ variable "github_organization" {
 }
 
 variable "repository" {
-  description = "Repository containing the published solution definitions."
+  description = "Repository containing the solution definitions."
   type        = string
   default     = "enterprise-solution-definitions"
 }
 
 variable "release_tag" {
-  description = "Release tag identifying the solution definitions to retrieve."
+  description = "Release tag identifying the solution definitions asset to retrieve."
   type        = string
 
   validation {

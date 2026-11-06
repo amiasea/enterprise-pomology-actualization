@@ -1,6 +1,9 @@
 variable "github_organization_name" {
-  type    = string
-  default = "amiasea"
+  type = string
+}
+
+variable "enterprise_solution_github_organization_name" {
+  type = string
 }
 
 variable "gha_id" {
@@ -8,6 +11,10 @@ variable "gha_id" {
 }
 
 variable "gha_installation_id" {
+  type = string
+}
+
+variable "enterprise_solution_gha_installation_id" {
   type = string
 }
 
