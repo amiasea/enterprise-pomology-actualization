@@ -6,19 +6,16 @@ data "github_release" "this" {
 }
 
 locals {
-  pomology_assets = {
-    for asset in data.github_release.this.assets :
-    trimsuffix(asset.name, "-pomology.json") => asset
+  pomology_asset = one([
+    for asset in data.github_release.this.assets : asset
     if endswith(asset.name, "-pomology.json")
-  }
+  ])
 }
 
-data "github_release_asset" "pomologies" {
-  for_each = local.pomology_assets
-
+data "github_release_asset" "pomology" {
   owner = var.github_organization
   repository = var.repository
-  asset_id = each.value.id
+  asset_id = local.pomology_asset.id
 
   download_file_contents = true
 }

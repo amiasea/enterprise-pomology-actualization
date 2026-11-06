@@ -1,5 +1,5 @@
-component "solution_definitions" {
-  source = "./modules/solution_definitions"
+component "solution_definition" {
+  source = "./modules/solution_definition"
 
   inputs = {
     github_organization = "amiasea"
@@ -8,7 +8,7 @@ component "solution_definitions" {
   }
 
   providers = {
-    github = provider.github.this
+    github = provider.github.amiasea
   }
 }
 
@@ -16,74 +16,63 @@ component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
   version = "1.0.3"
 
-  for_each = component.solution_definitions.pomologies
-
   inputs = {
-    pomology         = each.value
-    repo_name_prefix = each.key
+    pomology = component.solution_definition.pomology
 
-    github_organization_name = var.github_organization_name
+    repo_name_prefix = split("-", var.solution_definitions_release_tag)[1]
+
+    github_organization_name = "amiasea"
     github_app_id            = var.gha_id
   }
 
   providers = {
-    github = provider.github.this
+    github = provider.github.amiasea_enterprise_solution
   }
 }
 
 locals {
-  solution_aspect_options = {
-    for solution_name in keys(component.solution_definitions.pomologies) :
-    solution_name => sort(tolist(toset(flatten([
-      for cordon in values(component.espalier[solution_name].variety_cordon_repositories) : [
-        for variety in values(cordon.varieties) : [
-          for leaf in values(variety.leaves) : leaf.option
-        ]
+  solution_aspect_options = sort(tolist(toset(flatten([
+    for cordon in values(component.espalier.variety_cordon_repositories) : [
+      for variety in values(cordon.varieties) : [
+        for leaf in values(variety.leaves) : leaf.option
       ]
-    ]))))
-  }
+    ]
+  ]))))
 
-  solution_github_oidc_subject_identifiers = {
-    for solution_name in keys(component.solution_definitions.pomologies) :
-    solution_name => sort(tolist(toset(flatten([
-      for cordon_subjects in values(component.espalier[solution_name].variety_cordon_repositories) : concat(
-        [
-          "repo:amiasea@${component.espalier[solution_name].organization.id}/${cordon_subjects.cordon.repository_name}@${cordon_subjects.cordon.repository_id}:*"
-        ],
-        flatten([
-          for variety in values(cordon_subjects.varieties) : [
-            for leaf in values(variety.leaves) :
-            "repo:amiasea@${component.espalier[solution_name].organization.id}/${leaf.repository_name}@${leaf.repository_id}:*"
-          ]
-        ])
-      )
-    ]))))
-  }
-
-  solution_github_repository_ids = {
-    for solution_name in keys(component.solution_definitions.pomologies) :
-    solution_name => sort(tolist(toset(flatten([
-      for cordon in values(component.espalier[solution_name].variety_cordon_repositories) : concat(
-        [cordon.cordon.repository_id],
-        [
-          for leaf in flatten([
-            for variety in values(cordon.varieties) :
-            values(variety.leaves)
-          ]) : leaf.repository_id
+  solution_github_oidc_subject_identifiers = sort(tolist(toset(flatten([
+    for cordon_subjects in values(component.espalier.variety_cordon_repositories) : concat(
+      [
+        "repo:amiasea@${component.espalier.organization.id}/${cordon_subjects.cordon.repository_name}@${cordon_subjects.cordon.repository_id}:*"
+      ],
+      flatten([
+        for variety in values(cordon_subjects.varieties) : [
+          for leaf in values(variety.leaves) :
+          "repo:amiasea@${component.espalier.organization.id}/${leaf.repository_name}@${leaf.repository_id}:*"
         ]
-      )
-    ]))))
-  }
+      ])
+    )
+  ]))))
+
+  solution_github_repository_ids = sort(tolist(toset(flatten([
+    for cordon in values(component.espalier.variety_cordon_repositories) : concat(
+      [cordon.cordon.repository_id],
+      [
+        for leaf in flatten([
+          for variety in values(cordon.varieties) :
+          values(variety.leaves)
+        ]) : leaf.repository_id
+      ]
+    )
+  ]))))
 }
 
 component "solution_aspect_options_aws_artifacts" {
-  source   = "./modules/solution_aspect_options_aws_artifacts"
-  for_each = component.solution_definitions.pomologies
+  source = "./modules/solution_aspect_options_aws_artifacts"
 
   inputs = {
-    solution_name = each.key
+    solution_name = split("-", var.solution_definitions_release_tag)[1]
 
-    aspect_options = local.solution_aspect_options[each.key]
+    aspect_options = local.solution_aspect_options
 
     codeartifact_domain = var.codeartifact_domain
   }
@@ -94,23 +83,22 @@ component "solution_aspect_options_aws_artifacts" {
 }
 
 component "aws_artifact_publish_access" {
-  source   = "./modules/aws_artifact_publish_access"
-  for_each = component.solution_aspect_options_aws_artifacts
+  source = "./modules/aws_artifact_publish_access"
 
   inputs = {
-    role_name = "amiasea-${each.key}-publish"
+    role_name = "amiasea-${split("-", var.solution_definitions_release_tag)[1]}-publish"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 
-    github_oidc_subject_identifiers = local.solution_github_oidc_subject_identifiers[each.key]
+    github_oidc_subject_identifiers = local.solution_github_oidc_subject_identifiers
 
     codeartifact_domain_arn = var.codeartifact_domain_arn
 
-    codeartifact_repository_arns = values(each.value.package_repository_arns)
+    codeartifact_repository_arns = values(component.solution_aspect_options_aws_artifacts.package_repository_arns)
 
-    codeartifact_package_arns = values(each.value.codeartifact_package_arns)
+    codeartifact_package_arns = values(component.solution_aspect_options_aws_artifacts.codeartifact_package_arns)
 
-    ecr_repository_arns = values(each.value.ecr_repository_arns)
+    ecr_repository_arns = values(component.solution_aspect_options_aws_artifacts.ecr_repository_arns)
 
     solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
@@ -121,23 +109,22 @@ component "aws_artifact_publish_access" {
 }
 
 component "aws_artifact_restore_access" {
-  source   = "./modules/aws_artifact_restore_access"
-  for_each = component.solution_aspect_options_aws_artifacts
+  source = "./modules/aws_artifact_restore_access"
 
   inputs = {
-    role_name = "amiasea-${each.key}-restore"
+    role_name = "amiasea-${split("-", var.solution_definitions_release_tag)[1]}-restore"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 
-    github_oidc_subject_identifiers = local.solution_github_oidc_subject_identifiers[each.key]
+    github_oidc_subject_identifiers = local.solution_github_oidc_subject_identifiers
 
     codeartifact_domain_arn = var.codeartifact_domain_arn
 
-    codeartifact_repository_arns = values(each.value.package_repository_arns)
+    codeartifact_repository_arns = values(component.solution_aspect_options_aws_artifacts.package_repository_arns)
 
-    codeartifact_package_arns = values(each.value.codeartifact_package_arns)
+    codeartifact_package_arns = values(component.solution_aspect_options_aws_artifacts.codeartifact_package_arns)
 
-    ecr_repository_arns = values(each.value.ecr_repository_arns)
+    ecr_repository_arns = values(component.solution_aspect_options_aws_artifacts.ecr_repository_arns)
 
     solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
   }
