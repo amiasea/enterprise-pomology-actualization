@@ -27,7 +27,7 @@ deployment "solution" {
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = store.varset.this.solution_definitions_release_tag
+    solution_definitions_release_tag = store.varset.this.stable.solution_definitions_release_tag
   }
 }
 
@@ -45,7 +45,7 @@ deployment "solution_testing" {
 
     codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
     codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
-    codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
+    codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_ownerter
     solution_actualization_role_arn     = store.varset.this.stable.solution_actualization_role_arn
     solution_artifact_role_boundary_arn = store.varset.this.stable.solution_artifact_role_boundary_arn
 
