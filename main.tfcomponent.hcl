@@ -21,7 +21,7 @@ component "espalier" {
 
     repo_name_prefix = split("-", var.solution_definitions_release_tag)[1]
 
-    github_organization_name = "amiasea"
+    github_organization_name = "amiasea-enterprise-solution"
     github_app_id            = var.gha_id
   }
 
