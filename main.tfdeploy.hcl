@@ -54,9 +54,3 @@ deployment "solution_testing" {
     solution_definitions_release_tag = "v1.0.0-testing"
   }
 }
-
-publish_output "solution_variety_topology" {
-  description = "Actualized repository topology of the solution and variety."
-
-  value = deployment.solution.solution_variety_topology
-}
