@@ -14,7 +14,7 @@ component "solution_definition" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.4"
+  version = "1.0.6"
 
   inputs = {
     pomology = component.solution_definition.pomology
@@ -23,6 +23,10 @@ component "espalier" {
 
     github_organization_name = "amiasea-enterprise-solution"
     github_app_id            = var.gha_id
+
+    ruleset_enforcement = var.ruleset_enforcement
+
+    solution_definitions_release_tag = var.solution_definitions_release_tag
   }
 
   providers = {
