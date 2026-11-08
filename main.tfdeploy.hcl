@@ -8,6 +8,7 @@ store "varset" "this" {
 }
 
 deployment "solution" {
+  destroy = true
   inputs = {
     github_organization_name                     = "amiasea"
     enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
@@ -32,6 +33,7 @@ deployment "solution" {
 }
 
 deployment "solution_testing" {
+  destroy = true
   inputs = {
     github_organization_name                     = "amiasea"
     enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
