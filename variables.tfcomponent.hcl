@@ -68,3 +68,8 @@ variable "solution_definitions_release_tag" {
   description = "Solution definitions release tag"
   type        = string
 }
+
+variable "ruleset_enforcement" {
+  type    = string
+  default = "disabled"
+}

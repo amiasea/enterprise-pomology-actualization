@@ -8,7 +8,6 @@ store "varset" "this" {
 }
 
 deployment "solution" {
-  destroy = true
   inputs = {
     github_organization_name                     = "amiasea"
     enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
@@ -29,11 +28,12 @@ deployment "solution" {
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
     solution_definitions_release_tag = store.varset.this.stable.solution_definitions_release_tag
+
+    ruleset_enforcement = "disabled"
   }
 }
 
 deployment "solution_testing" {
-  destroy = true
   inputs = {
     github_organization_name                     = "amiasea"
     enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
@@ -54,5 +54,7 @@ deployment "solution_testing" {
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
     solution_definitions_release_tag = "v1.0.0-testing"
+
+    ruleset_enforcement = "disabled"
   }
 }
