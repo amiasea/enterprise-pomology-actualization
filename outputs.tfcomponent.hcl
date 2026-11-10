@@ -26,7 +26,7 @@
 #   })
 
 #   value = {
-#     definition_release = var.solution_definitions_release_tag
+#     definition_release = var.pomology_definitions_release_tag
 
 #     varieties = {
 #       for variety_name in toset(component.solution_definition.pomology.varieties) :

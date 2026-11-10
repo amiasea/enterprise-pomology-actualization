@@ -48,7 +48,7 @@ The `modules/` directory contains the Terraform modules used by the stack:
 | Module | Responsibility |
 |---|---|
 | `solution_definitions` | Retrieves Pomology JSON assets from a specified release of `amiasea/enterprise-solution-definitions`. |
-| `solution_aspect_options_aws_artifacts` | Creates AWS artifact repositories and packages for a solution's aspect options. |
+| `pomology_aspect_options_aws_artifacts` | Creates AWS artifact repositories and packages for a solution's aspect options. |
 | `aws_artifact_publish_access` | Creates an AWS IAM role and permissions for GitHub Actions to publish artifacts. |
 | `aws_artifact_restore_access` | Creates an AWS IAM role and permissions for GitHub Actions to restore artifacts. |
 | `solution_github_actions_variables` | Manages GitHub Actions variables associated with solutions. |
@@ -67,7 +67,7 @@ flowchart TD
     C --> E["Derive aspect options"]
     D --> F["Repository identities"]
     D --> G["GitHub OIDC subject identifiers"]
-    E --> H["solution_aspect_options_aws_artifacts"]
+    E --> H["pomology_aspect_options_aws_artifacts"]
     H --> I["AWS artifact resources"]
     F --> G
     I --> J["Artifact resource ARNs"]
@@ -101,7 +101,7 @@ These derived values connect the GitHub repository structure to the AWS artifact
 
 ### 3. Provision AWS artifact resources
 
-For each solution, the `solution_aspect_options_aws_artifacts` module provisions the AWS artifact resources associated with its aspect options.
+For each solution, the `pomology_aspect_options_aws_artifacts` module provisions the AWS artifact resources associated with its aspect options.
 
 The stack derives the distinct aspect options from the Espalier outputs and passes them to the module alongside the configured CodeArtifact domain.
 
@@ -128,7 +128,7 @@ The stack's configuration includes the following integration points:
 
 | Configuration | Purpose |
 |---|---|
-| `solution_definitions_release_tag` | Selects the release of `amiasea/enterprise-solution-definitions` to consume. |
+| `pomology_definitions_release_tag` | Selects the release of `amiasea/enterprise-solution-definitions` to consume. |
 | `github_organization_name` | GitHub organization targeted by Espalier. |
 | `gha_id` | GitHub App ID passed to Espalier. |
 | `github_oidc_provider_arn` | AWS GitHub OIDC provider used by the artifact access roles. |
@@ -157,7 +157,7 @@ flowchart TD
     A --> B["modules/"]
     B --> C["aws_artifact_publish_access/"]
     B --> D["aws_artifact_restore_access/"]
-    B --> E["solution_aspect_options_aws_artifacts/"]
+    B --> E["pomology_aspect_options_aws_artifacts/"]
     B --> F["solution_definitions/"]
     B --> G["solution_github_actions_variables/"]
     A --> H["Root Stack configuration"]
