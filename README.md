@@ -1,4 +1,4 @@
-# Enterprise Solution Actualization
+# Enterprise Solution Propagation
 
 This repository contains the Terraform Stack configuration and supporting modules used to actualize Amiasea enterprise solution definitions.
 
@@ -6,10 +6,10 @@ The stack consumes released Pomology documents from [`amiasea/enterprise-solutio
 
 ## Architecture
 
-The actualization stack coordinates three areas:
+The propagation stack coordinates three areas:
 
 1. **Solution definitions** — retrieves released Pomology documents that describe the intended repository hierarchy and aspect options for each solution.
-2. **GitHub actualization** — invokes the PMR Espalier module to create the repositories and associated structures described by each Pomology.
+2. **GitHub propagation** — invokes the PMR Espalier module to create the repositories and associated structures described by each Pomology.
 3. **Artifact infrastructure and access** — provisions AWS ECR and CodeArtifact resources, then establishes GitHub Actions OIDC roles for publishing and restoring artifacts.
 
 The stack operates across solutions using the solution names derived from the Pomology asset filenames.
@@ -39,7 +39,7 @@ component "espalier" {
 
 Each Pomology is passed to a separate Espalier component instance. The solution name becomes the repository name prefix.
 
-Espalier is maintained and versioned independently of this repository. Its published PMR version is therefore an explicit dependency of the actualization stack.
+Espalier is maintained and versioned independently of this repository. Its published PMR version is therefore an explicit dependency of the propagation stack.
 
 ### Supporting modules
 
@@ -55,7 +55,7 @@ The `modules/` directory contains the Terraform modules used by the stack:
 
 The Espalier module is not maintained in this repository. It is consumed from the PMR.
 
-## Actualization flow
+## Propagation flow
 
 The stack follows this dependency flow:
 
@@ -128,7 +128,7 @@ The stack's configuration includes the following integration points:
 
 | Configuration | Purpose |
 |---|---|
-| `pomology_definitions_release_tag` | Selects the release of `amiasea/enterprise-solution-definitions` to consume. |
+| `pomology_flora_release_tag` | Selects the release of `amiasea/enterprise-solution-definitions` to consume. |
 | `github_organization_name` | GitHub organization targeted by Espalier. |
 | `gha_id` | GitHub App ID passed to Espalier. |
 | `github_oidc_provider_arn` | AWS GitHub OIDC provider used by the artifact access roles. |
@@ -139,7 +139,7 @@ GitHub and AWS provider configurations and credentials must also be available to
 
 ## Dependencies
 
-The actualization stack depends on:
+The propagation stack depends on:
 
 - The `amiasea/enterprise-solution-definitions` GitHub repository and its published Pomology releases.
 - The Espalier module published to the Amiasea HCP Terraform Private Module Registry.
@@ -147,13 +147,13 @@ The actualization stack depends on:
 - An AWS GitHub Actions OIDC provider.
 - The AWS resources and permissions required to manage ECR, CodeArtifact, and IAM.
 
-The Espalier module version is declared explicitly in the stack configuration. Updating that dependency is an intentional change to the repository actualization implementation.
+The Espalier module version is declared explicitly in the stack configuration. Updating that dependency is an intentional change to the repository propagation implementation.
 
 ## Repository structure
 
 ```mermaid
 flowchart TD
-    A["enterprise-solution-actualization"]
+    A["enterprise-solution-propagation"]
     A --> B["modules/"]
     B --> C["aws_artifact_publish_access/"]
     B --> D["aws_artifact_restore_access/"]

@@ -1,5 +1,5 @@
-variable "solution_name" {
-  description = "Codename of the enterprise solution being actualized."
+variable "pomology_name" {
+  description = "Codename of the enterprise pomology being propagated."
   type        = string
 }
 

@@ -1,7 +1,7 @@
 locals {
   artifact_repository_names = {
     for aspect_option in var.aspect_options :
-    aspect_option => "amiasea-${var.solution_name}-${aspect_option}"
+    aspect_option => "amiasea-${var.pomology_name}-${aspect_option}"
   }
 }
 
@@ -25,5 +25,5 @@ resource "aws_codeartifact_repository" "package_repository" {
 
   domain      = var.codeartifact_domain
   repository  = each.value
-  description = "Private packages for ${var.solution_name} aspect option ${each.key}."
+  description = "Private packages for ${var.pomology_name} aspect option ${each.key}."
 }
