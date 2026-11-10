@@ -39,7 +39,7 @@ provider "aws" "this" {
     region = "us-east-1"
 
     assume_role_with_web_identity {
-      role_arn           = var.pomology_actualization_role_arn
+      role_arn           = var.pomology_propagation_role_arn
       web_identity_token = var.aws_identity_token
     }
   }

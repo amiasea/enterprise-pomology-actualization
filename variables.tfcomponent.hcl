@@ -47,8 +47,8 @@ variable "codeartifact_domain_owner" {
   type        = string
 }
 
-variable "pomology_actualization_role_arn" {
-  description = "ARN of the AWS role that will be assumed by the GitHub Actions workflow to perform pomology actualization."
+variable "pomology_propagation_role_arn" {
+  description = "ARN of the AWS role that will be assumed by the GitHub Actions workflow to perform pomology propagation."
   type        = string
 }
 
@@ -64,7 +64,7 @@ variable "github_oidc_provider_arn" {
 
 //////
 
-variable "pomology_definitions_release_tag" {
+variable "pomology_flora_release_tag" {
   description = "Pomology definitions release tag"
   type        = string
 }

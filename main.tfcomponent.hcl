@@ -4,7 +4,7 @@ component "pomology_definition" {
   inputs = {
     github_organization = "amiasea"
     repository          = "enterprise-pomology-definitions"
-    release_tag         = var.pomology_definitions_release_tag
+    release_tag         = var.pomology_flora_release_tag
   }
 
   providers = {
@@ -14,19 +14,19 @@ component "pomology_definition" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.14"
+  version = "1.0.15"
 
   inputs = {
     pomology = component.pomology_definition.pomology
 
-    repo_name_prefix = split("-", var.pomology_definitions_release_tag)[1]
+    repo_name_prefix = split("-", var.pomology_flora_release_tag)[1]
 
     github_organization_name = "amiasea-enterprise-orchard"
     github_app_id            = var.gha_id
 
     ruleset_enforcement = var.ruleset_enforcement
 
-    pomology_definitions_release_tag = var.pomology_definitions_release_tag
+    pomology_flora_release_tag = var.pomology_flora_release_tag
   }
 
   providers = {
@@ -74,7 +74,7 @@ component "pomology_aspect_options_aws_artifacts" {
   source = "./modules/pomology_aspect_options_aws_artifacts"
 
   inputs = {
-    solution_name = split("-", var.pomology_definitions_release_tag)[1]
+    pomology_name = split("-", var.pomology_flora_release_tag)[1]
 
     aspect_options = local.pomology_aspect_options
 
@@ -90,7 +90,7 @@ component "aws_artifact_publish_access" {
   source = "./modules/aws_artifact_publish_access"
 
   inputs = {
-    role_name = "amiasea-${split("-", var.pomology_definitions_release_tag)[1]}-publish"
+    role_name = "amiasea-${split("-", var.pomology_flora_release_tag)[1]}-publish"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 
@@ -116,7 +116,7 @@ component "aws_artifact_restore_access" {
   source = "./modules/aws_artifact_restore_access"
 
   inputs = {
-    role_name = "amiasea-${split("-", var.pomology_definitions_release_tag)[1]}-restore"
+    role_name = "amiasea-${split("-", var.pomology_flora_release_tag)[1]}-restore"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 

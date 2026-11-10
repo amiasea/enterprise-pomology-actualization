@@ -3,7 +3,7 @@ identity_token "aws" {
 }
 
 store "varset" "this" {
-  name     = "enterprise-pomology-actualization"
+  name     = "enterprise-pomology-propagation"
   category = "terraform"
 }
 
@@ -22,12 +22,12 @@ deployment "pomology" {
     codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
     codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
     codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
-    pomology_actualization_role_arn     = store.varset.this.stable.pomology_actualization_role_arn
+    pomology_propagation_role_arn     = store.varset.this.stable.pomology_propagation_role_arn
     pomology_artifact_role_boundary_arn = store.varset.this.stable.pomology_artifact_role_boundary_arn
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    pomology_definitions_release_tag = store.varset.this.stable.pomology_definitions_release_tag
+    pomology_flora_release_tag = store.varset.this.stable.pomology_flora_release_tag
 
     ruleset_enforcement = "disabled"
   }
@@ -48,12 +48,12 @@ deployment "pomology_testing" {
     codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
     codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
     codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
-    pomology_actualization_role_arn     = store.varset.this.stable.pomology_actualization_role_arn
+    pomology_propagation_role_arn     = store.varset.this.stable.pomology_propagation_role_arn
     pomology_artifact_role_boundary_arn = store.varset.this.stable.pomology_artifact_role_boundary_arn
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    pomology_definitions_release_tag = "v1.0.1-testing"
+    pomology_flora_release_tag = "v1.0.1-testing"
 
     ruleset_enforcement = "disabled"
   }
