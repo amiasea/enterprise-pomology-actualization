@@ -2,7 +2,7 @@ variable "github_organization_name" {
   type = string
 }
 
-variable "enterprise_solution_github_organization_name" {
+variable "enterprise_orchard_github_organization_name" {
   type = string
 }
 
@@ -14,7 +14,7 @@ variable "gha_installation_id" {
   type = string
 }
 
-variable "enterprise_solution_gha_installation_id" {
+variable "enterprise_orchard_gha_installation_id" {
   type = string
 }
 
@@ -47,13 +47,13 @@ variable "codeartifact_domain_owner" {
   type        = string
 }
 
-variable "solution_actualization_role_arn" {
-  description = "ARN of the AWS role that will be assumed by the GitHub Actions workflow to perform solution actualization."
+variable "pomology_actualization_role_arn" {
+  description = "ARN of the AWS role that will be assumed by the GitHub Actions workflow to perform pomology actualization."
   type        = string
 }
 
-variable "solution_artifact_role_boundary_arn" {
-  description = "ARN of the AWS role boundary that will be applied to the solution artifact roles."
+variable "pomology_artifact_role_boundary_arn" {
+  description = "ARN of the AWS role boundary that will be applied to the pomology artifact roles."
   type        = string
 }
 
@@ -64,8 +64,8 @@ variable "github_oidc_provider_arn" {
 
 //////
 
-variable "solution_definitions_release_tag" {
-  description = "Solution definitions release tag"
+variable "pomology_definitions_release_tag" {
+  description = "Pomology definitions release tag"
   type        = string
 }
 

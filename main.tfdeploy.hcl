@@ -3,57 +3,57 @@ identity_token "aws" {
 }
 
 store "varset" "this" {
-  name     = "enterprise-solution-actualization"
+  name     = "enterprise-pomology-actualization"
   category = "terraform"
 }
 
-deployment "solution" {
+deployment "pomology" {
   inputs = {
-    github_organization_name                     = "amiasea"
-    enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
+    github_organization_name                    = "amiasea"
+    enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
 
-    gha_id                                  = store.varset.this.stable.gha_id
-    gha_installation_id                     = store.varset.this.stable.gha_installation_id
-    enterprise_solution_gha_installation_id = store.varset.this.stable.enterprise_solution_gha_installation_id
-    gha_pem_file                            = store.varset.this.gha_pem_file
+    gha_id                                 = store.varset.this.stable.gha_id
+    gha_installation_id                    = store.varset.this.stable.gha_installation_id
+    enterprise_orchard_gha_installation_id = store.varset.this.stable.enterprise_orchard_gha_installation_id
+    gha_pem_file                           = store.varset.this.gha_pem_file
 
     aws_identity_token = identity_token.aws.jwt
 
     codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
     codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
     codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
-    solution_actualization_role_arn     = store.varset.this.stable.solution_actualization_role_arn
-    solution_artifact_role_boundary_arn = store.varset.this.stable.solution_artifact_role_boundary_arn
+    pomology_actualization_role_arn     = store.varset.this.stable.pomology_actualization_role_arn
+    pomology_artifact_role_boundary_arn = store.varset.this.stable.pomology_artifact_role_boundary_arn
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = store.varset.this.stable.solution_definitions_release_tag
+    pomology_definitions_release_tag = store.varset.this.stable.pomology_definitions_release_tag
 
     ruleset_enforcement = "disabled"
   }
 }
 
-deployment "solution_testing" {
+deployment "pomology_testing" {
   inputs = {
-    github_organization_name                     = "amiasea"
-    enterprise_solution_github_organization_name = "amiasea-enterprise-solution"
+    github_organization_name                    = "amiasea"
+    enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
 
-    gha_id                                  = store.varset.this.stable.gha_id
-    gha_installation_id                     = store.varset.this.stable.gha_installation_id
-    enterprise_solution_gha_installation_id = store.varset.this.stable.enterprise_solution_gha_installation_id
-    gha_pem_file                            = store.varset.this.gha_pem_file
+    gha_id                                 = store.varset.this.stable.gha_id
+    gha_installation_id                    = store.varset.this.stable.gha_installation_id
+    enterprise_orchard_gha_installation_id = store.varset.this.stable.enterprise_orchard_gha_installation_id
+    gha_pem_file                           = store.varset.this.gha_pem_file
 
     aws_identity_token = identity_token.aws.jwt
 
     codeartifact_domain                 = store.varset.this.stable.codeartifact_domain
     codeartifact_domain_arn             = store.varset.this.stable.codeartifact_domain_arn
     codeartifact_domain_owner           = store.varset.this.stable.codeartifact_domain_owner
-    solution_actualization_role_arn     = store.varset.this.stable.solution_actualization_role_arn
-    solution_artifact_role_boundary_arn = store.varset.this.stable.solution_artifact_role_boundary_arn
+    pomology_actualization_role_arn     = store.varset.this.stable.pomology_actualization_role_arn
+    pomology_artifact_role_boundary_arn = store.varset.this.stable.pomology_artifact_role_boundary_arn
 
     github_oidc_provider_arn = store.varset.this.stable.github_oidc_provider_arn
 
-    solution_definitions_release_tag = "v1.0.0-testing"
+    pomology_definitions_release_tag = "v1.0.1-testing"
 
     ruleset_enforcement = "disabled"
   }

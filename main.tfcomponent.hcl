@@ -1,10 +1,10 @@
-component "solution_definition" {
-  source = "./modules/solution_definition"
+component "pomology_definition" {
+  source = "./modules/pomology_definition"
 
   inputs = {
     github_organization = "amiasea"
-    repository          = "enterprise-solution-definitions"
-    release_tag         = var.solution_definitions_release_tag
+    repository          = "enterprise-pomology-definitions"
+    release_tag         = var.pomology_definitions_release_tag
   }
 
   providers = {
@@ -14,28 +14,28 @@ component "solution_definition" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.12"
+  version = "1.0.13"
 
   inputs = {
-    pomology = component.solution_definition.pomology
+    pomology = component.pomology_definition.pomology
 
-    repo_name_prefix = split("-", var.solution_definitions_release_tag)[1]
+    repo_name_prefix = split("-", var.pomology_definitions_release_tag)[1]
 
-    github_organization_name = "amiasea-enterprise-solution"
+    github_organization_name = "amiasea-enterprise-orchard"
     github_app_id            = var.gha_id
 
     ruleset_enforcement = var.ruleset_enforcement
 
-    solution_definitions_release_tag = var.solution_definitions_release_tag
+    pomology_definitions_release_tag = var.pomology_definitions_release_tag
   }
 
   providers = {
-    github = provider.github.amiasea_enterprise_solution
+    github = provider.github.amiasea_enterprise_orchard
   }
 }
 
 locals {
-  solution_aspect_options = sort(tolist(toset(flatten([
+  pomology_aspect_options = sort(tolist(toset(flatten([
     for cordon in values(component.espalier.variety_cordon_repositories) : [
       for variety in values(cordon.varieties) : [
         for leaf in values(variety.leaves) : leaf.option
@@ -70,13 +70,13 @@ locals {
   ]))))
 }
 
-component "solution_aspect_options_aws_artifacts" {
-  source = "./modules/solution_aspect_options_aws_artifacts"
+component "pomology_aspect_options_aws_artifacts" {
+  source = "./modules/pomology_aspect_options_aws_artifacts"
 
   inputs = {
-    solution_name = split("-", var.solution_definitions_release_tag)[1]
+    solution_name = split("-", var.pomology_definitions_release_tag)[1]
 
-    aspect_options = local.solution_aspect_options
+    aspect_options = local.pomology_aspect_options
 
     codeartifact_domain = var.codeartifact_domain
   }
@@ -90,7 +90,7 @@ component "aws_artifact_publish_access" {
   source = "./modules/aws_artifact_publish_access"
 
   inputs = {
-    role_name = "amiasea-${split("-", var.solution_definitions_release_tag)[1]}-publish"
+    role_name = "amiasea-${split("-", var.pomology_definitions_release_tag)[1]}-publish"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 
@@ -98,13 +98,13 @@ component "aws_artifact_publish_access" {
 
     codeartifact_domain_arn = var.codeartifact_domain_arn
 
-    codeartifact_repository_arns = values(component.solution_aspect_options_aws_artifacts.package_repository_arns)
+    codeartifact_repository_arns = values(component.pomology_aspect_options_aws_artifacts.package_repository_arns)
 
-    codeartifact_package_arns = values(component.solution_aspect_options_aws_artifacts.codeartifact_package_arns)
+    codeartifact_package_arns = values(component.pomology_aspect_options_aws_artifacts.codeartifact_package_arns)
 
-    ecr_repository_arns = values(component.solution_aspect_options_aws_artifacts.ecr_repository_arns)
+    ecr_repository_arns = values(component.pomology_aspect_options_aws_artifacts.ecr_repository_arns)
 
-    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
+    pomology_artifact_role_boundary_arn = var.pomology_artifact_role_boundary_arn
   }
 
   providers = {
@@ -116,7 +116,7 @@ component "aws_artifact_restore_access" {
   source = "./modules/aws_artifact_restore_access"
 
   inputs = {
-    role_name = "amiasea-${split("-", var.solution_definitions_release_tag)[1]}-restore"
+    role_name = "amiasea-${split("-", var.pomology_definitions_release_tag)[1]}-restore"
 
     github_oidc_provider_arn = var.github_oidc_provider_arn
 
@@ -124,13 +124,13 @@ component "aws_artifact_restore_access" {
 
     codeartifact_domain_arn = var.codeartifact_domain_arn
 
-    codeartifact_repository_arns = values(component.solution_aspect_options_aws_artifacts.package_repository_arns)
+    codeartifact_repository_arns = values(component.pomology_aspect_options_aws_artifacts.package_repository_arns)
 
-    codeartifact_package_arns = values(component.solution_aspect_options_aws_artifacts.codeartifact_package_arns)
+    codeartifact_package_arns = values(component.pomology_aspect_options_aws_artifacts.codeartifact_package_arns)
 
-    ecr_repository_arns = values(component.solution_aspect_options_aws_artifacts.ecr_repository_arns)
+    ecr_repository_arns = values(component.pomology_aspect_options_aws_artifacts.ecr_repository_arns)
 
-    solution_artifact_role_boundary_arn = var.solution_artifact_role_boundary_arn
+    pomology_artifact_role_boundary_arn = var.pomology_artifact_role_boundary_arn
   }
 
   providers = {

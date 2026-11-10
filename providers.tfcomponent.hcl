@@ -22,13 +22,13 @@ provider "github" "amiasea" {
   }
 }
 
-provider "github" "amiasea_enterprise_solution" {
+provider "github" "amiasea_enterprise_orchard" {
   config {
-    owner = var.enterprise_solution_github_organization_name
+    owner = var.enterprise_orchard_github_organization_name
 
     app_auth {
       id              = var.gha_id
-      installation_id = var.enterprise_solution_gha_installation_id
+      installation_id = var.enterprise_orchard_gha_installation_id
       pem_file        = var.gha_pem_file
     }
   }
@@ -39,7 +39,7 @@ provider "aws" "this" {
     region = "us-east-1"
 
     assume_role_with_web_identity {
-      role_arn           = var.solution_actualization_role_arn
+      role_arn           = var.pomology_actualization_role_arn
       web_identity_token = var.aws_identity_token
     }
   }
