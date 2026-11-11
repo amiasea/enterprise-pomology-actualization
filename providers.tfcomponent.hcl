@@ -55,7 +55,8 @@ provider "azurerm" "this" {
     features {}
 
     tenant_id       = var.azure_tenant_id
-    client_id       = var.azure_orchard_client_id
+    # client_id       = var.azure_orchard_client_id
+    client_id = "2af05f18-08ac-4edc-bee1-5b490d8b2e96"
     subscription_id = var.azure_institutive_subscription_id
 
     use_oidc   = true

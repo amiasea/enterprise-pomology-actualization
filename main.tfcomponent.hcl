@@ -143,7 +143,7 @@ component "azure_key_vault_federated_access" {
 
   inputs = {
     enterprise_orchard_github_organization_name = var.enterprise_orchard_github_organization_name
-    azure_institutive_resource_group_name             = var.azure_institutive_resource_group_name
+    azure_institutive_resource_group_name       = var.azure_institutive_resource_group_name
     repo_name_prefix                            = split("-", var.pomology_flora_release_tag)[1]
   }
 
