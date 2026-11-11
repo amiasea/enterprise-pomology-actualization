@@ -24,7 +24,7 @@ locals {
 
   enterprise_orchard_federated_credential_subject_identifiers = {
     for repository_id, repository in local.enterprise_orchard_repositories :
-    repository_id => "repo:${data.github_organization.amiasea_enterprise_orchard.name}@${data.github_organization.amiasea_enterprise_orchard.id}/${repository.name}@${repository.repository_id}:pull_request"
+    repository_id => "repo:${var.enterprise_orchard_github_organization_name}@${data.github_organization.amiasea_enterprise_orchard.id}/${repository.name}@${repository.repository_id}:pull_request"
   }
 }
 
