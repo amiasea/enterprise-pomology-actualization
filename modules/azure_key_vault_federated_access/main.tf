@@ -1,6 +1,6 @@
 data "azurerm_user_assigned_identity" "enterprise_workload_institutive" {
   name                = "amiasea-enterprise-workload-institutive"
-  resource_group_name = var.institutive_resource_group_name
+  resource_group_name = var.azure_institutive_resource_group_name
 }
 
 data "github_repositories" "orchard_repositories" {
