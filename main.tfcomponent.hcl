@@ -137,3 +137,22 @@ component "aws_artifact_restore_access" {
     aws = provider.aws.this
   }
 }
+
+component "azure_key_vault_federated_access" {
+  source = "./modules/azure_key_vault_federated_access"
+
+  inputs = {
+    enterprise_orchard_github_organization_name = var.enterprise_orchard_github_organization_name
+    institutive_resource_group_name             = var.institutive_resource_group_name
+    repo_name_prefix                            = split("-", var.pomology_flora_release_tag)[1]
+  }
+
+  depends_on = [
+    component.espalier
+  ]
+
+  providers = {
+    github  = provider.github.amiasea_enterprise_orchard
+    azurerm = provider.azurerm.this
+  }
+}
