@@ -15,10 +15,10 @@ deployment "pomology" {
   inputs = {
     github_organization_name                    = "amiasea"
     enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
-    azure_institutive_resource_group_name             = store.varset.this.stable.azure_institutive_resource_group_name
+    azure_institutive_resource_group_name       = store.varset.this.stable.azure_institutive_resource_group_name
 
     azure_tenant_id                   = store.varset.this.stable.azure_tenant_id
-    azure_institutive_client_id       = store.varset.this.stable.azure_institutive_client_id
+    azure_orchard_client_id           = store.varset.this.stable.azure_orchard_client_id
     azure_institutive_subscription_id = store.varset.this.stable.azure_institutive_subscription_id
 
     gha_id                                 = store.varset.this.stable.gha_id
@@ -47,10 +47,10 @@ deployment "pomology_testing" {
   inputs = {
     github_organization_name                    = "amiasea"
     enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
-    azure_institutive_resource_group_name             = store.varset.this.stable.azure_institutive_resource_group_name
+    azure_institutive_resource_group_name       = store.varset.this.stable.azure_institutive_resource_group_name
 
     azure_tenant_id                   = store.varset.this.stable.azure_tenant_id
-    azure_institutive_client_id       = store.varset.this.stable.azure_institutive_client_id
+    azure_orchard_client_id           = store.varset.this.stable.azure_orchard_client_id
     azure_institutive_subscription_id = store.varset.this.stable.azure_institutive_subscription_id
 
     gha_id                                 = store.varset.this.stable.gha_id

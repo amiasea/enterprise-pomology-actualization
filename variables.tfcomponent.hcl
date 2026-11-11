@@ -14,7 +14,7 @@ variable "azure_tenant_id" {
   type = string
 }
 
-variable "azure_institutive_client_id" {
+variable "azure_orchard_client_id" {
   type = string
 }
 
