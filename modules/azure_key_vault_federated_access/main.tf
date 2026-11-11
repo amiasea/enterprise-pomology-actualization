@@ -3,6 +3,11 @@ data "azurerm_user_assigned_identity" "enterprise_workload_orchard" {
   resource_group_name = var.azure_institutive_resource_group_name
 }
 
+data "azurerm_user_assigned_identity" "enterprise_workload_institutive" {
+  name                = "amiasea-enterprise-workload-institutive"
+  resource_group_name = var.azure_institutive_resource_group_name
+}
+
 data "github_repositories" "orchard_repositories" {
   query           = "org:amiasea-enterprise-orchard archived:false"
   include_repo_id = true
@@ -31,7 +36,7 @@ locals {
 resource "azurerm_federated_identity_credential" "enterprise_workload_orchard" {
   for_each = local.enterprise_orchard_federated_credential_subject_identifiers
 
-  user_assigned_identity_id = data.azurerm_user_assigned_identity.enterprise_workload_orchard.id
+  user_assigned_identity_id = data.azurerm_user_assigned_identity.enterprise_workload_institutive.id
 
   name     = "github-${substr(sha256(each.value), 0, 16)}"
   audience = ["api://AzureADTokenExchange"]
