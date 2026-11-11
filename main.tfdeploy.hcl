@@ -8,7 +8,6 @@ store "varset" "this" {
 }
 
 deployment "pomology" {
-  destroy = true
   inputs = {
     github_organization_name                    = "amiasea"
     enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
@@ -35,7 +34,6 @@ deployment "pomology" {
 }
 
 deployment "pomology_testing" {
-  destroy = true
   inputs = {
     github_organization_name                    = "amiasea"
     enterprise_orchard_github_organization_name = "amiasea-enterprise-orchard"
