@@ -6,6 +6,22 @@ variable "enterprise_orchard_github_organization_name" {
   type = string
 }
 
+variable "institutive_resource_group_name" {
+  type = string
+}
+
+variable "azure_tenant_id" {
+  type = string
+}
+
+variable "azure_institutive_client_id" {
+  type = string
+}
+
+variable "azure_institutive_subscription_id" {
+  type = string
+}
+
 variable "gha_id" {
   type = string
 }
@@ -27,7 +43,13 @@ variable "gha_pem_file" {
 ///// artifact_access /////
 
 variable "aws_identity_token" {
-  description = "JWT identity token from the GitHub Actions workflow that will be used to assume the AWS role."
+  description = "JWT identity token that will be used to assume the AWS role."
+  type        = string
+  ephemeral   = true
+}
+
+variable "azure_identity_token" {
+  description = "JWT identity token that will be used to assume the UAMI role."
   type        = string
   ephemeral   = true
 }
