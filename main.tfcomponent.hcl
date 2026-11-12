@@ -14,7 +14,7 @@ component "pomology_definition" {
 
 component "espalier" {
   source  = "app.terraform.io/amiasea/espalier/github"
-  version = "1.0.17"
+  version = "1.0.18"
 
   inputs = {
     pomology = component.pomology_definition.pomology
